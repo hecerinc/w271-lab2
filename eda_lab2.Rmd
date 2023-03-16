@@ -1,0 +1,31 @@
+```{r}
+library(fpp3)
+data(co2)
+```
+
+```{r}
+df <- as_tsibble(co2)
+```
+
+```{r}
+df %>% autoplot() + theme_bw()
+```
+
+
+```{r}
+plot(decompose(co2))
+```
+
+```{r}
+ACF(df) %>% autoplot() + theme_bw()
+```
+
+```{r}
+PACF(df) %>% autoplot() + theme_bw()
+```
+
+```{r}
+decomp <- decompose(co2, type="mult")
+acf(window(decomp$random))
+```
+
