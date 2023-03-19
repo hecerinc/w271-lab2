@@ -305,7 +305,9 @@ log_co2_quadratic_season %>%
 # Create a forecast object based on the model
 co2_quadratic_tmp <- x %>% 
 	model(TSLM(value ~ trend() + I(trend()^2) + season()))
-  
+
+# save(co2_quadratic_tmp, file='1997_quad_seasonal_modelfit.RData')
+
 quad.forecast <- fabletools::forecast(co2_quadratic_tmp, h = 276)
 
 # Forecast + previous data graph
@@ -402,6 +404,10 @@ arima013011%>%
   gg_tsresiduals() 
 
 ```
+```{r Save the ARIMA model to use in the other report}
+saveRDS(arima013011, '1997_arima_modelfit.rds')
+```
+
 > The residuals time series plot shows a flat mean at 0, and the only one lag in the acf plot is significant, and the residuals are normally distributed. Thus, the model (ARIMA(0,1,3),(0,1,1)(12)) fit the CO2 data well. 
 
 ```{r}
