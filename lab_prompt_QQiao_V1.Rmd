@@ -1,0 +1,482 @@
+---
+title: 'Statistical Methods for Discrete Response, Time Series, and Panel Data (W271): Lab 2'
+geometry: margin=1in
+output:
+  github_document: default
+---
+
+# The Keeling Curve
+
+In the 1950s, the geochemist Charles David Keeling observed a seasonal pattern in the amount of carbon dioxide present in air samples collected over the course of several years. He was able to attribute this pattern to the variation in global rates of photosynthesis throughout the year, caused by the difference in land area and vegetation cover between the Earth's northern and southern hemispheres. 
+
+In 1958 Keeling began continuous monitoring of atmospheric carbon dioxide concentrations from the Mauna Loa Observatory in Hawaii and soon observed a trend increase carbon dioxide levels in addition to the seasonal cycle. He was able to attribute this trend increase to growth in global rates of fossil fuel combustion. This trend has continued to the present, and is known as the "Keeling Curve."
+
+```{r load packages, echo = FALSE, message = FALSE}
+library(tidyverse)
+library(tsibble)
+library(latex2exp)
+library(tsibble)
+library(lubridate)
+library(fable)
+library(forecast)
+library(dplyr)
+library(feasts)
+library(ggplot2)
+library(gridExtra)
+library(AICcmodavg)
+library(feasts)
+library(astsa)
+library(patchwork)
+library(tseries)
+
+theme_set(theme_minimal())
+knitr::opts_chunk$set(dpi=1000)
+
+```
+
+```{r plot the keeling curve, echo = FALSE}
+tsibble::as_tsibble(co2) %>%
+  ggplot() + 
+  aes(x=index, y=value) + 
+  geom_line(color = 'steelblue') +
+  labs(
+    title = TeX(r'(Monthly Mean $CO_2$)'),
+    subtitle = 'The "Keeling Curve"',
+    x = 'Month and Year',
+    y = TeX(r'($CO_2$ parts per million)')
+  )
+```
+\newpage
+
+# Your Assignment 
+
+Your goal in this assignment is to produce a comprehensive analysis of the Mona Loa CO2 data that you will be read by an interested, supervising data scientist. Rather than this being a final report, you might think of this as being a contribution to your laboratory. You and your group have been initially charged with the task of investigating the trends of global CO2, and told that if you find "anything interesting" that the team may invest more resources into assessing the question. 
+
+Because this is the scenario that you are responding to: 
+
+1. Your writing needs to be clear, well-reasoned, and concise. Your peers will be reading this, and you have a reputation to maintain.
+2. Decisions that you make for your analysis need also be clear and well-reasoned. While the main narrative of your deliverable might only present the modeling choices that you determine are the most appropriate, there might exist supporting materials that examine what the consequences of other choices would be. As a concrete example, if you determine that a series is an AR(1) process your main analysis might provide the results of the critical test that led you to that determination and the results of the rest of the analysis under AR(1) modeling choices. However, in an appendix or separate document that is linked in your main report, you might show what a MA model would have meant for your results instead.
+3. Your code and repository are a part of the deliverable. If you were to make a clear argument that this is a question worth pursuing, but then when the team turned to continue the work they found a repository that was a jumble of coding idioms, version-ed or outdated files, and skeletons it would be a disappointment.
+
+# Report from the Point of View of 1997 
+
+For the first part of this task, suspend reality for a short period of time and conduct your analysis from the point of view of a data scientist doing their work in the early months of 1998. Do this by using data that is included in _every_ R implementation, the `co2` dataset. This dataset is lazily loaded with every R instance, and is stored in an object called `co2`. 
+
+## (3 points) Task 0a: Introduction 
+
+Introduce the question to your audience. Suppose that they _could_ be interested in the question, but they don't have a deep background in the area. What is the question that you are addressing, why is it worth addressing, and what are you going to find at the completion of your analysis. Here are a few resource that you might use to start this motivation. 
+
+- [Wikipedia](https://en.wikipedia.org/wiki/Keeling_Curve)
+- [First Publication](./background/keeling_tellus_1960.pdf)
+- [Autobiography of Keeling](./background/keeling_annual_review.pdf)
+
+>The research behind the Keeling Curve is addressing the question of how the increase in atmospheric CO2 concentrations will affect the Earth's climate and ecosystems. The data from the Keeling Curve can be used to model the future impacts of climate change and to develop strategies for mitigating its effects.
+
+>This research is very important because it provides clear evidence of the long-term trend in atmospheric CO2 concentrations, which are primarily caused by the burning of fossil fuels and other human activities. The increase in atmospheric CO2 concentrations is causing global warming, which is leading to rising sea levels, more frequent and severe heatwaves, droughts, wildfires, and other extreme weather events. These changes have the potential to cause major environmental and economic disruptions, including damage to infrastructure, loss of biodiversity, and displacement of communities.
+
+>At the completion of the analysis, we can learn that the trend and seasonality in atmospheric CO2 concentrations over time.
+
+## (3 points) Task 1a: CO2 data
+Conduct a comprehensive Exploratory Data Analysis on the `co2` series. This should include (without being limited to) a [description of how, where and why ](https://gml.noaa.gov/ccgg/about/co2_measurements.html) the data is generated, a thorough investigation of the trend, seasonal and irregular elements. Trends both in levels and growth rates should be discussed (consider expressing longer-run growth rates as annualized averages).
+
+What you report in the deliverable should not be your own process of discovery, but rather a guided discussion that you have constructed so that your audience can come to an understanding as succinctly and successfully as possible. This means that figures should be thoughtfully constructed and what you learn from them should be discussed in text; to the extent that there is _any_ raw output from your analysis, you should intend for people to read and interpret it, and you should write your own interpretation as well. 
+```{r}
+head(co2)
+tail(co2)    
+```
+
+```{r}
+ts_co2 <- as_tsibble(co2)
+#time plot, histogram, ACF and PACF
+p1_plot <- ggplot(ts_co2, aes(x = index, y = value)) +
+  geom_point() +
+  labs(
+    title = TeX(r'(Monthly Mean $CO_2$ per Year)'),
+    x = 'Month',
+    y = TeX(r'($CO_2$ parts per million)')
+  )
+p3_acf <- ts_co2 %>%
+  ACF(value) %>%
+  autoplot() +
+  labs(title=TeX(r'(ACF of Monthly Mean $CO_2$)'))
+p4_pacf <- ts_co2 %>%
+  PACF(value) %>%
+  autoplot() +
+  labs(title=TeX(r'(PACF of Monthly Mean $CO_2$)'))
+p2_histogram <- ts_co2 %>%
+  ggplot(aes(x = value)) +
+  geom_histogram() +
+  labs(title=TeX(r'(Histogram of Monthly Mean $CO_2$)'),
+        x = TeX(r'($CO_2$ parts per million)'))
+#seasonal graph
+seasonal_graph <- ts_co2 %>%
+  gg_season(value) +
+  labs(
+    title = TeX(r'(Monthly Mean $CO_2$ per Year)'),
+    subtitle = 'Seasonal Plot',
+    x = 'Month',
+    y = TeX(r'($CO_2$ parts per million)')
+  )
+
+(p1_plot | p2_histogram) /
+  (p3_acf | p4_pacf)
+seasonal_graph
+```
+
+```{r}
+plot(decompose(co2, type="mult"))
+```
+
+
+
+## (3 points) Task 2a: Linear time trend model
+
+Fit a linear time trend model to the `co2` series, and examine the characteristics of the residuals. Compare this to a quadratic time trend model. Discuss whether a logarithmic transformation of the data would be appropriate. Fit a polynomial time trend model that incorporates seasonal dummy variables, and use this model to generate forecasts to the year 2020. 
+
+
+
+# TODO: Labels for plot
+
+```{r Fitting the linear model}
+# Linear time trend model
+co2_reg <- ts_co2 %>% 
+	model(TSLM(value ~ trend())) %>% 
+	report()
+co2_reg %>% gg_tsresiduals() 
+```
+
+```{r Fit the seasonalized model}
+# TODO: labels for plot
+co2_reg_season <- ts_co2 %>% 
+	model(TSLM(value ~ trend() + season())) %>% 
+	report()
+
+co2_reg_season %>% gg_tsresiduals() 
+```
+
+```{r Quad model}
+# Fit quadratic time trend model
+# TODO: labels for plot
+co2_quadratic <- ts_co2 %>% 
+	model(TSLM(value ~ trend() + I(trend()^2))) %>% 
+	report()
+
+co2_quadratic %>% gg_tsresiduals() 
+```
+
+```{r Quad model with seasonality}
+# Fit quadratic time trend model
+co2_quadratic_season <- ts_co2 %>% 
+	model(TSLM(value ~ trend() + I(trend()^2) + season())) %>% 
+	report()
+
+co2_quadratic_season %>% gg_tsresiduals() 
+```
+
+```{r, echo=FALSE,fig.height=6, fig.width=10}
+# TODO: adjust labels
+p1 <- augment(co2_reg)%>%
+  ggplot(aes(x = index)) +
+  geom_line(aes(y = value, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = "$CO_2$ parts per million",
+       title = "CO2 linear") 
+
+p2 <-augment(co2_reg_season)%>%
+  ggplot(aes(x = index)) +
+  geom_line(aes(y = value, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = "$CO_2$ parts per million",
+       title = "CO2 linear + seasonality")
+
+p3 <-augment(co2_quadratic)%>%
+  ggplot(aes(x = index)) +
+  geom_line(aes(y = value, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = "$CO_2$ parts per million",
+       title = "CO2 quadratic") 
+
+p4 <-augment(co2_quadratic_season)%>%
+  ggplot(aes(x = index)) +
+  geom_line(aes(y = value, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = "$CO_2$ parts per million",
+       title = "CO2 quadratic + seasonality") 
+
+grid.arrange(p1,p2,p3,p4, nrow = 2, ncol = 2)
+```
+
+> From the fitted value plots, we can see that the model co2_reg and co2_quadratic capture the trend quite well but do not capture the seasonal fluctuations. The quadratic model co2_quadratic did a better job than the linear model. 
+
+> Model co2_reg_season attempts to capture the seasonal effect; however, it underestimates the observed data.
+
+> Model co2_quadratic_season seems to do a good job capturing both trend and seasonal movement in the data.
+
+```{r Information criteria}
+# Compare the AIC, BIC btw linear model and quadratic model
+
+ic.m1 <- glance(co2_reg) %>%
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Linear")
+
+ic.m2 <- glance(co2_reg_season) %>%
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Linear + seasonality")
+
+ic.m3 <- glance(co2_quadratic) %>%
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Quadratic")
+
+ic.m4 <- glance(co2_quadratic_season) %>%
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Quadratic + seasonality")
+
+rbind(ic.m1, ic.m2, ic.m3, ic.m4) %>% arrange(AICc, BIC)
+```
+
+> From the outputs above, the fourth model with both quadratic trend and seasonal variables is the best model becasue it has the lowest AIC, corrected AIC, or BIC score. 
+
+
+# TODO: are there any hypothesis tests we should be running here? [STRETCH]
+
+
+```{r Log transformation}
+# log transformation 
+ts_log_co2 <- ts_co2 %>% 
+      mutate(log_co2 = log(value))
+
+head(ts_log_co2)
+```
+
+
+
+```{r}
+log_co2_reg <- ts_log_co2 %>% 
+  model(TSLM(log_co2 ~ trend())) %>% 
+  report()
+
+log_co2_reg %>%
+gg_tsresiduals() 
+
+log_co2_reg_season <- ts_log_co2 %>% 
+  model(TSLM(log_co2 ~ trend()+ season())) %>% 
+  report()
+
+log_co2_reg_season %>%
+gg_tsresiduals() 
+
+log_co2_quadratic <- ts_log_co2 %>% 
+  model(TSLM(log_co2 ~ trend() + I(trend()^2))) %>% 
+  report()
+
+log_co2_quadratic %>%
+  gg_tsresiduals() 
+
+log_co2_quadratic_season<- ts_log_co2 %>% 
+  model(TSLM(log_co2 ~ trend() + I(trend()^2) +season())) %>% 
+  report()
+
+log_co2_quadratic_season %>%
+  gg_tsresiduals() 
+
+```
+> In the exploratory data analysis above, we did not observe a clear exponential trend in the CO2 data, and the variance did not appear to increase or decrease over time. Therefore, a logarithmic transformation may not be necessary for modeling the CO2 data. 
+
+
+```{r Forecast till 2020}
+#forecast to the year 2020
+
+# Create a forecast object based on the model
+save(co2_quadratic_season, file='1997_quad_seasonal_modelfit.RData')
+
+quad.forecast <- fabletools::forecast(co2_quadratic_season, h = "23 years")
+
+# Forecast + previous data graph
+forecast.graph <- quad.forecast %>% autoplot(ts_co2) + labs(title="Linear model forecast 1997-2020", x=NULL, y="Monthly mean CO2 ppm")
+forecast.graph
+```
+
+
+## (3 points) Task 3a: ARIMA times series model 
+
+Following all appropriate steps, choose an ARIMA model to fit to the series. Discuss the characteristics of your model and how you selected between alternative ARIMA specifications. Use your model (or models) to generate forecasts to the year 2022. 
+
+> From the EDA, we found the CO2 time series has obviously trend and seasonality. With the first differencing, the time series seems to be sationary based on the series plot. From the ACF plot, we can see seasonal fluctuations very 12 lags (months).   
+
+```{r, warning=F}
+co2_diff <- diff(co2)
+# TODO: adjust labels
+
+# par(mfrow=c(2,2))
+# plot(co2_diff, type="l", main="First Difference of the CO2")
+# hist(co2_diff, xlab="Date", ylab="Frequency",  main="Frequency")
+# acf(co2_diff, col="darkorange2", main="ACF")
+# pacf(co2_diff, col="gold3", main="PACF")
+
+co2_diff2 <- ts_co2 %>%
+	gg_tsdisplay(difference(value, 12) %>% difference(),
+				 plot_type='partial', lag=36) +
+	labs(title="Seasonally differenced", y="")
+co2_diff2
+
+```
+
+```{r Run the PP and ADF tests}
+PP.test(co2_diff)
+adf.test(co2_diff, alternative = "stationary")
+```
+> Both Phillips Perron Test and Augmented Dickey Fuller (ADF) Tests show a p-value that is lower than 0.05 so we reject the null hypothesis that this the series is non-stationary. Thus, the time series with the first difference is stationary. We can start to build the model with 1 difference. 
+
+
+```{r Fit the ARIMA models}
+fit <-  ts_co2 %>%
+	model(
+		arima111000 = ARIMA(value ~ pdq(1,1,1) + PDQ(0,0,0)),
+		arima121000 = ARIMA(value ~ pdq(1,2,1) + PDQ(0,0,0)),
+		arima214000 = ARIMA(value ~ pdq(2,1,4) + PDQ(0,0,0)),
+		arima012011 = ARIMA(value ~ pdq(0,1,2) + PDQ(0,1,1)),
+		arima210011 = ARIMA(value ~ pdq(2,1,0) + PDQ(0,1,1)),
+		arima111112 = ARIMA(value ~ pdq(1,1,1) + PDQ(1,1,2)),
+		auto = ARIMA(value, stepwise = FALSE, approx = FALSE)
+  )
+```
+
+```{r}
+fit %>%
+  report() %>% arrange(AIC) %>% select(-ar_roots, -ma_roots)
+```
+```{r}
+fit$auto[[1]]$fit$spec %>% knitr::kable()
+fit$auto[[1]]$fit$model
+```
+
+
+> Based on the AIC, AICc, BIC scores, The auto model (ARIMA(0,1,3),(0,1,1)(12)) have the lowest AIC and AICc and model (ARIMA(0,1,2),(0,1,1)(12)) has the lowest BIC. In this case,(ARIMA(0,1,3),(0,1,1)(12)) is the best fit model. 
+
+## TODO: why? We might choose based on BIC
+
+
+```{r}
+arima013011 <- ts_co2 %>%
+  model(arima013011 = ARIMA(value ~ pdq(0,1,3) + PDQ(0,1,1)) )
+
+# Create diagnostic plots for the residuals
+arima013011%>%
+  gg_tsresiduals() 
+
+```
+```{r Save the ARIMA model to use in the other report}
+saveRDS(arima013011, '1997_arima_modelfit.rds')
+```
+
+> The residuals time series plot shows a flat mean at 0, and only one lag in the acf plot is significant, and the residuals are normally distributed. Thus, the model (ARIMA(0,1,3),(0,1,1)(12)) fit the CO2 data well. 
+
+```{r}
+augment(arima013011) %>%
+	features(.resid, ljung_box, lag = 10, dof = 0)
+```
+
+> From the Ljung Box test, we got a large p-value that failed to reject the null hypothesis. This indicates that the residuals from the model arima013011 are randomly distributed, thus this is a good model fit. 
+
+```{r ARIMA forecast plot, warning=F}
+arima_forecast <- fabletools::forecast(arima013011, h = "103 years", level = c(80, 95)) # all the way to 2100 (1997 + 103 = 2100)
+
+arima_forecast_plot <- arima_forecast %>%
+	autoplot(colour="cornflowerblue") + 
+	autolayer(ts_co2, colour="black") + 
+	geom_line(data=arima013011 %>% 
+			  	augment(), aes(index,.fitted,color=.model)) + 
+	facet_wrap(~.model, ncol=1, nrow=3) +
+	geom_hline(yintercept = 420, color="steelblue") +
+	geom_hline(yintercept = 500, color="steelblue") +
+	labs(title="ARIMA(0,1,3)(0,1,1) forecast 1997-2100", y="Monthly mean CO2 ppm", x = NULL) +
+	scale_x_yearmonth(date_breaks = "5 year", date_labels = "%Y")
+arima_forecast_plot
+
+# accuracy(arima_forecast, ts_co2)
+```
+
+
+## (3 points) Task 4a: Forecast atmospheric CO2 growth 
+
+Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](https://research.noaa.gov/article/ArtMID/587/ArticleID/2764/Coronavirus-response-barely-slows-rising-carbon-dioxide) and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2100. How confident are you that these will be accurate predictions?
+
+
+```{r Produce the 420 and 500 thresholds table}
+# 420
+forecast.420 <- arima_forecast %>% filter(.mean >= 420 & .mean < 421) %>% hilo()
+first.420 <- head(select(forecast.420, `80%`, `95%`, .mean), 1)
+last.420 <- tail(select(forecast.420, `80%`, `95%`, .mean), 1)
+# 500
+forecast.500 <- arima_forecast %>% filter(.mean >= 500 & .mean < 501) %>% hilo()
+first.500 <- head(select(forecast.500, `80%`, `95%`, .mean), 1)
+last.500 <- tail(select(forecast.500, `80%`, `95%`, .mean), 1)
+
+
+values.420 <- data.frame(bind_rows(first.420, last.420))
+values.420$target <- 420
+values.420 <- mutate(values.420,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+
+values.500 <- data.frame(bind_rows(first.500, last.500))
+values.500 <- mutate(values.500,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+values.500$target <- 500
+
+forecast.thresholds <- bind_rows(values.420, values.500) %>% select(target, index, .mean, starts_with('ci'))
+# TODO: change the col names
+forecast.thresholds	%>% knitr::kable()
+```
+```{r 2100 data}
+values.2100 <- filter(arima_forecast, index >= as.Date('2100-01-01')) %>% hilo() %>% data.frame()
+mutate(values.2100,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.) %>% select(index, .mean, starts_with('ci')) %>% knitr::kable()
+```
+
+
+
+# Report from the Point of View of the Present 
+
+One of the very interesting features of Keeling and colleagues' research is that they were able to evaluate, and re-evaluate the data as new series of measurements were released. This permitted the evaluation of previous models' performance and a much more difficult question: If their models' predictions were "off" was this the result of a failure of the model, or a change in the system? 
+
+## (1 point) Task 0b: Introduction 
+
+In this introduction, you can assume that your reader will have **just** read your 1997 report. In this introduction, **very** briefly pose the question that you are evaluating, and describe what (if anything) has changed in the data generating process between 1997 and the present. 
+
+## (3 points) Task 1b: Create a modern data pipeline for Mona Loa CO2 data.
+
+The most current data is provided by the United States' National Oceanic and Atmospheric Administration, on a data page [[here](https://gml.noaa.gov/ccgg/trends/data.html)]. Gather the most recent weekly data from this page. (A group that is interested in even more data management might choose to work with the [hourly data](https://gml.noaa.gov/aftp/data/trace_gases/co2/in-situ/surface/mlo/co2_mlo_surface-insitu_1_ccgg_HourlyData.txt).) 
+
+Create a data pipeline that starts by reading from the appropriate URL, and ends by saving an object called `co2_present` that is a suitable time series object. 
+
+Conduct the same EDA on this data. Describe how the Keeling Curve evolved from 1997 to the present, noting where the series seems to be following similar trends to the series that you "evaluated in 1997" and where the series seems to be following different trends. This EDA can use the same, or very similar tools and views as you provided in your 1997 report. 
+
+## (1 point) Task 2b: Compare linear model forecasts against realized CO2
+
+Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from a linear time model in 1997 (i.e. "Task 2a"). (You do not need to run any formal tests for this task.) 
+
+## (1 point) Task 3b: Compare ARIMA models forecasts against realized CO2  
+
+Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from the ARIMA model that you fitted in 1997 (i.e. "Task 3a"). Describe how the Keeling Curve evolved from 1997 to the present. 
+
+## (3 points) Task 4b: Evaluate the performance of 1997 linear and ARIMA models 
+
+In 1997 you made predictions about the first time that CO2 would cross 420 ppm. How close were your models to the truth? 
+
+After reflecting on your performance on this threshold-prediction task, continue to use the weekly data to generate a month-average series from 1997 to the present, and compare the overall forecasting performance of your models from Parts 2a and 3b over the entire period. (You should conduct formal tests for this task.) 
+
+## (4 points) Task 5b: Train best models on present data
+
+Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) and non-seasonally-adjusted (NSA) series into training and test sets, using the last two years of observations as the test sets. For both SA and NSA series, fit ARIMA models using all appropriate steps. Measure and discuss how your models perform in-sample and (psuedo-) out-of-sample, comparing candidate models and explaining your choice. In addition, fit a polynomial time-trend model to the seasonally-adjusted series and compare its performance to that of your ARIMA model.
+
+## (3 points) Task Part 6b: How bad could it get?
+
+With the non-seasonally adjusted data series, generate predictions for when atmospheric CO2 is expected to be at 420 ppm and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2122. How confident are you that these will be accurate predictions?
