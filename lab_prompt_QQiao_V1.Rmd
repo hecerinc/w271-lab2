@@ -124,7 +124,7 @@ seasonal_graph
 ```
 
 ```{r}
-plot(decompose(co2))
+plot(decompose(co2, type="mult"))
 ```
 
 
@@ -134,47 +134,32 @@ plot(decompose(co2))
 Fit a linear time trend model to the `co2` series, and examine the characteristics of the residuals. Compare this to a quadratic time trend model. Discuss whether a logarithmic transformation of the data would be appropriate. Fit a polynomial time trend model that incorporates seasonal dummy variables, and use this model to generate forecasts to the year 2020. 
 
 
-```{r}
-# ts_co2 <- ts_co2%>%
-#   mutate(time = time(value))
-# ts_co2
 
-ts_co2 <- ts_co2 %>%
-	mutate(time = yearmonth(index) %>% 
-		   	as.numeric() - yearmonth(first(index)) %>% 
-		   	as.numeric()
-		   )
-ts_co2
-```
+# TODO: Labels for plot
 
-
-
-```{r}
-#Linear time trend model
-
-# co2_reg2 <- ts_co2 %>%
-#   model(TSLM(value ~ index)) %>%
-#   report()
-
+```{r Fitting the linear model}
+# Linear time trend model
 co2_reg <- ts_co2 %>% 
-  model(TSLM(value ~ time)) %>% 
-  report()
+	model(TSLM(value ~ trend())) %>% 
+	report()
 co2_reg %>% gg_tsresiduals() 
 ```
 
 ```{r Fit the seasonalized model}
+# TODO: labels for plot
 co2_reg_season <- ts_co2 %>% 
-  model(TSLM(value ~ time + season())) %>% 
-  report()
+	model(TSLM(value ~ trend() + season())) %>% 
+	report()
 
 co2_reg_season %>% gg_tsresiduals() 
 ```
 
 ```{r Quad model}
 # Fit quadratic time trend model
+# TODO: labels for plot
 co2_quadratic <- ts_co2 %>% 
-  model(TSLM(value ~ time + I(time^2))) %>% 
-  report()
+	model(TSLM(value ~ trend() + I(trend()^2))) %>% 
+	report()
 
 co2_quadratic %>% gg_tsresiduals() 
 ```
@@ -182,14 +167,14 @@ co2_quadratic %>% gg_tsresiduals()
 ```{r Quad model with seasonality}
 # Fit quadratic time trend model
 co2_quadratic_season <- ts_co2 %>% 
-  model(TSLM(value ~ time+I(time^2)+season())) %>% 
-  report()
+	model(TSLM(value ~ trend() + I(trend()^2) + season())) %>% 
+	report()
 
-co2_quadratic_season %>%
-gg_tsresiduals() 
+co2_quadratic_season %>% gg_tsresiduals() 
 ```
 
 ```{r, echo=FALSE,fig.height=6, fig.width=10}
+# TODO: adjust labels
 p1 <- augment(co2_reg)%>%
   ggplot(aes(x = index)) +
   geom_line(aes(y = value, colour = "Data")) +
@@ -197,21 +182,21 @@ p1 <- augment(co2_reg)%>%
   labs(y = "$CO_2$ parts per million",
        title = "CO2 linear") 
 
-p2<-augment(co2_reg_season)%>%
+p2 <-augment(co2_reg_season)%>%
   ggplot(aes(x = index)) +
   geom_line(aes(y = value, colour = "Data")) +
   geom_line(aes(y = .fitted, colour = "Fitted")) +
   labs(y = "$CO_2$ parts per million",
        title = "CO2 linear + seasonality")
 
-p3<-augment(co2_quadratic)%>%
+p3 <-augment(co2_quadratic)%>%
   ggplot(aes(x = index)) +
   geom_line(aes(y = value, colour = "Data")) +
   geom_line(aes(y = .fitted, colour = "Fitted")) +
   labs(y = "$CO_2$ parts per million",
        title = "CO2 quadratic") 
 
-p4<-augment(co2_quadratic_season)%>%
+p4 <-augment(co2_quadratic_season)%>%
   ggplot(aes(x = index)) +
   geom_line(aes(y = value, colour = "Data")) +
   geom_line(aes(y = .fitted, colour = "Fitted")) +
@@ -231,25 +216,24 @@ grid.arrange(p1,p2,p3,p4, nrow = 2, ncol = 2)
 # Compare the AIC, BIC btw linear model and quadratic model
 
 ic.m1 <- glance(co2_reg) %>%
-  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="m1")
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Linear")
 
 ic.m2 <- glance(co2_reg_season) %>%
-  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="m2")
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Linear + seasonality")
 
 ic.m3 <- glance(co2_quadratic) %>%
-  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="m3")
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Quadratic")
 
 ic.m4 <- glance(co2_quadratic_season) %>%
-  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="m4")
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Quadratic + seasonality")
 
 rbind(ic.m1, ic.m2, ic.m3, ic.m4) %>% arrange(AICc, BIC)
 ```
 
-> From the outputs above, the fourth model with both
-quadratic trend and seasonal variables is the best model becasue it has the lowest AIC, corrected AIC, or BIC score. 
+> From the outputs above, the fourth model with both quadratic trend and seasonal variables is the best model becasue it has the lowest AIC, corrected AIC, or BIC score. 
 
 
-# TODO: are there any hypothesis tests we should be running here?
+# TODO: are there any hypothesis tests we should be running here? [STRETCH]
 
 
 ```{r Log transformation}
@@ -258,38 +242,34 @@ ts_log_co2 <- ts_co2 %>%
       mutate(log_co2 = log(value))
 
 head(ts_log_co2)
-
-ts_log_co2 %>%
-      autoplot(log_co2) + theme_minimal() + xlab("")
-
 ```
 
 
 
 ```{r}
 log_co2_reg <- ts_log_co2 %>% 
-  model(TSLM(log_co2 ~ time)) %>% 
+  model(TSLM(log_co2 ~ trend())) %>% 
   report()
 
 log_co2_reg %>%
 gg_tsresiduals() 
 
 log_co2_reg_season <- ts_log_co2 %>% 
-  model(TSLM(log_co2 ~ time+ season())) %>% 
+  model(TSLM(log_co2 ~ trend()+ season())) %>% 
   report()
 
 log_co2_reg_season %>%
 gg_tsresiduals() 
 
 log_co2_quadratic <- ts_log_co2 %>% 
-  model(TSLM(log_co2 ~ time + I(time^2))) %>% 
+  model(TSLM(log_co2 ~ trend() + I(trend()^2))) %>% 
   report()
 
 log_co2_quadratic %>%
   gg_tsresiduals() 
 
 log_co2_quadratic_season<- ts_log_co2 %>% 
-  model(TSLM(log_co2 ~ time + I(time^2) +season())) %>% 
+  model(TSLM(log_co2 ~ trend() + I(trend()^2) +season())) %>% 
   report()
 
 log_co2_quadratic_season %>%
@@ -303,23 +283,13 @@ log_co2_quadratic_season %>%
 #forecast to the year 2020
 
 # Create a forecast object based on the model
-co2_quadratic_tmp <- x %>% 
-	model(TSLM(value ~ trend() + I(trend()^2) + season()))
+save(co2_quadratic_season, file='1997_quad_seasonal_modelfit.RData')
 
-# save(co2_quadratic_tmp, file='1997_quad_seasonal_modelfit.RData')
-
-quad.forecast <- fabletools::forecast(co2_quadratic_tmp, h = 276)
+quad.forecast <- fabletools::forecast(co2_quadratic_season, h = "23 years")
 
 # Forecast + previous data graph
-forecast.graph <- quad.forecast %>% autoplot(ts_co2)
-
-# target_dec_2018 <- targetData %>%
-#   filter(yearmonth(Date) == yearmonth("2018 Dec"))
-# fit%>%forecast(new_data=target_dec_2018)%>% autoplot(targetData %>% filter(yearmonth(Date) < yearmonth("2018 Dec")))
-# fcast %>%
-#   autoplot(ts_log_co2)
-# Print the forecast object
-
+forecast.graph <- quad.forecast %>% autoplot(ts_co2) + labs(title="Linear model forecast 1997-2020", x=NULL, y="Monthly mean CO2 ppm")
+forecast.graph
 ```
 
 
@@ -329,75 +299,62 @@ Following all appropriate steps, choose an ARIMA model to fit to the series. Dis
 
 > From the EDA, we found the CO2 time series has obviously trend and seasonality. With the first differencing, the time series seems to be sationary based on the series plot. From the ACF plot, we can see seasonal fluctuations very 12 lags (months).   
 
-```{r}
-co2_diff<- diff(co2)
+```{r, warning=F}
+# co2_diff<- diff(co2)
+# TODO: adjust labels
 
-par(mfrow=c(2,2))
-plot(co2_diff, type="l", main="First Difference of the CO2")
-hist(co2_diff, xlab="Date", ylab="Frequency",  main="Frequency")
-acf(co2_diff, col="darkorange2", main="ACF")
-pacf(co2_diff, col="gold3", main="PACF")
+# par(mfrow=c(2,2))
+# plot(co2_diff, type="l", main="First Difference of the CO2")
+# hist(co2_diff, xlab="Date", ylab="Frequency",  main="Frequency")
+# acf(co2_diff, col="darkorange2", main="ACF")
+# pacf(co2_diff, col="gold3", main="PACF")
 
-# co2_diff2 <- ts_co2 %>%
-#   gg_tsdisplay(difference(value, 12) %>%
-#                  difference(),
-#                  plot_type='partial', lag=36) +
-#                   labs(title="Seasonally differenced", y="")
-# co2_diff2
+co2_diff2 <- ts_co2 %>%
+	gg_tsdisplay(difference(value, 12) %>% difference(),
+				 plot_type='partial', lag=36) +
+	labs(title="Seasonally differenced", y="")
+co2_diff2
 
 ```
 
-```{r}
-
+```{r Run the PP and ADF tests}
 PP.test(co2_diff)
-
 adf.test(co2_diff, alternative = "stationary")
 ```
 > Both Phillips Perron Test and Augmented Dickey Fuller (ADF) Tests show a p-value that is lower than 0.05 so we reject the null hypothesis that this the series is non-stationary. Thus, the time series with the first difference is stationary. We can start to build the model with 1 difference. 
 
-```{r}
-ts_co2_new <- as_tsibble(co2,index =index) 
-head(ts_co2_new) 
-```
 
-```{r}
-fit <-  ts_co2_new %>%
-  model(
-  	arima111000 = ARIMA(value ~ pdq(1,1,1) + PDQ(0,0,0)),
-  	arima121000 = ARIMA(value ~ pdq(1,2,1) + PDQ(0,0,0)),
-  	arima214000 = ARIMA(value ~ pdq(2,1,4) + PDQ(0,0,0)),
-  	arima012011 = ARIMA(value ~ pdq(0,1,2) + PDQ(0,1,1)),
-  	arima210011 = ARIMA(value ~ pdq(2,1,0) + PDQ(0,1,1)),
-  	arima111112 = ARIMA(value ~ pdq(1,1,1) + PDQ(1,1,2)),
-  	auto = ARIMA(value, stepwise = FALSE, approx = FALSE)
+```{r Fit the ARIMA models}
+fit <-  ts_co2 %>%
+	model(
+		arima111000 = ARIMA(value ~ pdq(1,1,1) + PDQ(0,0,0)),
+		arima121000 = ARIMA(value ~ pdq(1,2,1) + PDQ(0,0,0)),
+		arima214000 = ARIMA(value ~ pdq(2,1,4) + PDQ(0,0,0)),
+		arima012011 = ARIMA(value ~ pdq(0,1,2) + PDQ(0,1,1)),
+		arima210011 = ARIMA(value ~ pdq(2,1,0) + PDQ(0,1,1)),
+		arima111112 = ARIMA(value ~ pdq(1,1,1) + PDQ(1,1,2)),
+		auto = ARIMA(value, stepwise = FALSE, approx = FALSE)
   )
 ```
 
 ```{r}
 fit %>%
-  report() %>% arrange(BIC)
+  report() %>% arrange(AIC) %>% select(-ar_roots, -ma_roots)
 ```
+```{r}
+fit$auto[[1]]$fit$spec %>% knitr::kable()
+fit$auto[[1]]$fit$model
+```
+
+
 > Based on the AIC, AICc, BIC scores, The auto model (ARIMA(0,1,3),(0,1,1)(12)) have the lowest AIC and AICc and model (ARIMA(0,1,2),(0,1,1)(12)) has the lowest BIC. In this case,(ARIMA(0,1,3),(0,1,1)(12)) is the best fit model. 
 
 ## TODO: why? We might choose based on BIC
 
-```{r}
-fit2 <- ts_co2_new %>%
-  model(ARIMA(value ~ pdq(0:10,1:2,0:10) + PDQ(0:10,1:2,0:10)))
-
-fit2 %>%
-  report()
-```
 
 ```{r}
-# fit$auto
-
-arima013011 <- ts_co2_new %>%
+arima013011 <- ts_co2 %>%
   model(arima013011 = ARIMA(value ~ pdq(0,1,3) + PDQ(0,1,1)) )
-
-# Summarize the ARIMA model
-arima013011 %>%
-  glance()
 
 # Create diagnostic plots for the residuals
 arima013011%>%
@@ -408,31 +365,21 @@ arima013011%>%
 saveRDS(arima013011, '1997_arima_modelfit.rds')
 ```
 
-> The residuals time series plot shows a flat mean at 0, and the only one lag in the acf plot is significant, and the residuals are normally distributed. Thus, the model (ARIMA(0,1,3),(0,1,1)(12)) fit the CO2 data well. 
+> The residuals time series plot shows a flat mean at 0, and only one lag in the acf plot is significant, and the residuals are normally distributed. Thus, the model (ARIMA(0,1,3),(0,1,1)(12)) fit the CO2 data well. 
 
 ```{r}
 augment(arima013011) %>%
 	features(.resid, ljung_box, lag = 10, dof = 0)
 ```
 
-> From the Ljung Box test, we got a large p-value that failed to reject the null hypothesis. This indicates that the residuals from the model arima013011 are randomly distributed,  thus this is a good model fit. 
+> From the Ljung Box test, we got a large p-value that failed to reject the null hypothesis. This indicates that the residuals from the model arima013011 are randomly distributed, thus this is a good model fit. 
 
-```{r}
-
-# co2_forcast <- fit %>%
-#   forecast(ts_co2_new)
-# 
-# co2_forcast %>%
-#   filter(.model %in% c("auto")) %>%
-#   autoplot(ts_co2_new)+
-#   labs(y = "CO2 parts per million",title = "CO2 Forecast") +
-#   guides(colour = guide_legend(title = "Forecast"))
-
-arima_forecast <- fabletools::forecast(arima013011, h = "100 years", level = c(80, 95))
+```{r ARIMA forecast plot, warning=F}
+arima_forecast <- fabletools::forecast(arima013011, h = "103 years", level = c(80, 95)) # all the way to 2100 (1997 + 103 = 2100)
 
 arima_forecast_plot <- arima_forecast %>%
 	autoplot(colour="cornflowerblue") + 
-	autolayer(ts_co2_new, colour="black") + 
+	autolayer(ts_co2, colour="black") + 
 	geom_line(data=arima013011 %>% 
 			  	augment(), aes(index,.fitted,color=.model)) + 
 	facet_wrap(~.model, ncol=1, nrow=3) +
@@ -442,8 +389,15 @@ arima_forecast_plot <- arima_forecast %>%
 	scale_x_yearmonth(date_breaks = "5 year", date_labels = "%Y")
 arima_forecast_plot
 
-# accuracy(arima_forecast, ts_co2_new)
+# accuracy(arima_forecast, ts_co2)
 ```
+
+
+## (3 points) Task 4a: Forecast atmospheric CO2 growth 
+
+Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](https://research.noaa.gov/article/ArtMID/587/ArticleID/2764/Coronavirus-response-barely-slows-rising-carbon-dioxide) and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2100. How confident are you that these will be accurate predictions?
+
+
 ```{r Produce the 420 and 500 thresholds table}
 # 420
 forecast.420 <- arima_forecast %>% filter(.mean >= 420 & .mean < 421) %>% hilo()
@@ -474,40 +428,20 @@ values.500 <- mutate(values.500,
 values.500$target <- 500
 
 forecast.thresholds <- bind_rows(values.420, values.500) %>% select(target, index, .mean, starts_with('ci'))
-forecast.thresholds	
+# TODO: change the col names
+forecast.thresholds	%>% knitr::kable()
+```
+```{r 2100 data}
+values.2100 <- filter(arima_forecast, index >= as.Date('2100-01-01')) %>% hilo() %>% data.frame()
+mutate(values.2100,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.) %>% select(index, .mean, starts_with('ci')) %>% knitr::kable()
 ```
 
 
-## (3 points) Task 4a: Forecast atmospheric CO2 growth 
-
-Generate predictions for when atmospheric CO2 is expected to be at [420 ppm](https://research.noaa.gov/article/ArtMID/587/ArticleID/2764/Coronavirus-response-barely-slows-rising-carbon-dioxide) and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2100. How confident are you that these will be accurate predictions?
-
-```{r}
-# Generate 420 ppm prediction
-co2_420 <- ts_co2_new %>%
-  forecast::forecast(arima013011, h = 10, level = c(80, 95)) %>%
-  filter(.level == 80) %>%
-  filter(value >= 420) %>%
-  slice(1)
-  
-# Generate 500 ppm prediction
-co2_500 <- ts_co2_new %>%
-  forecast(arima013011, h = 10, level = c(80, 95)) %>%
-  filter(.level == 80) %>%
-  filter(value >= 500) %>%
-  slice(1)
-
-# Print predictions
-cat("The atmospheric CO2 is expected to reach 420 ppm for the first time in:",
-    as.yearmonth(co2_420$index), "with 80% prediction interval:",
-    co2_420$`80%`[1], "-", co2_420$`80%`[2], "\n")
-
-cat("The atmospheric CO2 is expected to reach 500 ppm for the first time in:",
-    as.yearmonth(co2_500$index), "with 80% prediction interval:",
-    co2_500$`80%`[1], "-", co2_500$`80%`[2], "\n")
-
-
-```
 
 # Report from the Point of View of the Present 
 
