@@ -152,7 +152,7 @@ Conduct the same EDA on this data. Describe how the Keeling Curve evolved from 1
 # change eval=T to run this for the first time, otherwise always load the (already saved) data
 noaa_colnames <- c('year', 'month', 'day', 'decimal', 'ppm', 'n.days', 'lag.1Y', 'lag.10Y', 'delta.1800')
 co2_present <- read_table('https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_weekly_mlo.txt', skip = 53, col_names = noaa_colnames, na="-999.99")
-co2_present <- mutate(co2_present, date = as.Date(paste(year, month, day, sep="-"))) %>% mutate(week = yearweek(date, week_start=7)) # start week on Sunday
+co2_present <- mutate(co2_present, date = as.Date(paste(year, month, day, sep="-"))) %>% mutate(week = yearweek(date))
 co2_present <- select(co2_present, -decimal, -delta.1800, -year, -month, -day)
 
 # Create the tsibble
@@ -302,8 +302,8 @@ co2_present.components <- components(dcmp_add)
 ```
 
 ```{r Split train/test}
-test.df <- filter(co2_present.components, year(week) >= 2020 & year(week) < 2023)
-train.df <- filter(co2_present.components, year(week) < 2020)
+test.df <- filter(co2_present.components, year(week) >= 2021 & year(week) < 2023)
+train.df <- filter(co2_present.components, year(week) < 2021)
 ```
 
 ```{r Seasonally adjusted data tests for stationarity}
@@ -321,14 +321,15 @@ adf.test(train.diff.nsa$diff[-1], alternative = "stationary")
 ```{r ARIMA models}
 train.df.ts <- select(train.df, week, ppm)
 # autofit.arima.aic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
-# autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
+# autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=T, greedy=T))
+# saveRDS(autofit.arima.bic, file='autofit.arima.bic.nsa.rds')
 autofit.arima.aic <- readRDS('autofit.arima.aic.nsa.rds')
 autofit.arima.bic <- readRDS('autofit.arima.bic.nsa.rds')
 autofit.arima.aic %>% report()
 autofit.arima.bic %>% report()
 
 train.df.ts.sa <- select(train.df, week, season_adjust)
-# autofit.arima.aic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
+autofit.arima.aic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=T, greedy=T))
 # autofit.arima.bic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
 # saveRDS(autofit.arima.aic.sa, file="autofit.arima.aic.sa.Rds")
 # saveRDS(autofit.arima.bic.sa, file="autofit.arima.bic.sa.Rds")
@@ -360,14 +361,13 @@ bind_rows(
 
 ```{r Out of sample NSA}
 # Using the ARIMA(1,0,2)(1,1,0) (chosen by AIC)
-nsa.fc <- fabletools::forecast(autofit.arima.bic,h="2 years")
-attr(autofit.arima.bic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
-nd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
-nd <- tsibble::fill_gaps(nd)
-attr(nd$week, "week_start") <- 7
-nd <- as_tsibble(nd)
-# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
 nsa.fc <- fabletools::forecast(autofit.arima.bic, h="2 years")
+# attr(autofit.arima.bic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
+# nd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
+# nd <- tsibble::fill_gaps(nd)
+# attr(nd$week, "week_start") <- 7
+# nd <- as_tsibble(nd)
+# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
 nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
 ```
 
