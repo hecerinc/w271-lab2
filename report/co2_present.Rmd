@@ -17,8 +17,8 @@ author:
 acknowledgements: | 
   The authors would like to thank their instructors from MIDS 271.
 abstract: | 
-  In 1997, our team analyzed the 
-  The year is 1997 and global attention is turning toward the consequences of human-actions in our environmental system. The IPCC has been in existence and studying these trends for more than ten years, and has released its second assessment report in 1995. In this report, the IPCC notes that the balance of the evidence suggests that human-actions play a role in the changing climate. Although, there is little political will to change this activity, neither have global progressive and conservative politicians broken into clear partisan camps. Here, we assess data from the Mona Loa observatory to describe and predict global $CO_{2}$ concentrations under several possible scenarios. What we find, when we run the analysis, is going to be grim. 
+  In 1997, our team analyzed $CO_{2}$ concentration avaerage monthly trends from 1959 to 1997. Our work culminated in a report that discussed multiple linear and ARIMA models of these concentration data and attempted to forecast $CO_{2}$ trends into the future, as far out as 2100. Given that we now have 25 more years of data, and at a highly weekly resolution, this report aims to revisit and evaluate our 1997 models. Using weekly average $CO_{2}$ concentration levels taking from the Mauna Loa observatory, we also analyze our data to fit new models and generate updated forcasts for potential $CO_{2}$ concentrations as far out as 100 years into the future.
+
 header-includes: 
   - '\usepackage{graphicx}'
   - '\usepackage{booktabs}'
@@ -47,13 +47,11 @@ knitr::opts_chunk$set(dpi=1000)
 
 # Introduction 
 
-In this introduction, you can assume that your reader will have **just** read your 1997 report. In this introduction, **very** briefly pose the question that you are evaluating, and describe what (if anything) has changed in the data generating process between 1997 and the present.
+In this report, we are continuing to evaluate atmospheric $CO_{2}$ trends (commonly referred to as the Keeling Curve), generating models and forecasts to help understand how we might expect atmospheric $CO_{2}$ levels to change in the future. Specifically, we are re-evaluating our best performing linear and ARIMA models from our 1997 report on $CO_{2}$ concentrations, using more recently generating weekly average $CO_{2}$ data up through the end of 2022. This report continues to use the $CO_{2}$ concentration data collected by the Mauna Loa observatory, with the key exception that we have weekly average $CO_{2}$ concentration data, compared to the monthly average concentration data used in 1997. Depending on the purposes of our analyses, we will either keep the weekly granularity or regenerate monthly averages as necessary. In addition to evaluating our 1997 models and forecasts, we will also use more recent data to generate new models and forecasts for $CO_{2}$ concentrations.
 
 # Measurement and Data 
 
-## (3 points) Task 1b: Create a modern data pipeline for Mona Loa CO2 data.
-The most current data is provided by the United States' National Oceanic and Atmospheric Administration, on a data page [[here](https://gml.noaa.gov/ccgg/trends/data.html)]. Gather the most recent weekly data from this page. (A group that is interested in even more data management might choose to work with the [hourly data](https://gml.noaa.gov/aftp/data/trace_gases/co2/in-situ/surface/mlo/co2_mlo_surface-insitu_1_ccgg_HourlyData.txt).)
-Create a data pipeline that starts by reading from the appropriate URL, and ends by saving an object called `co2_present` that is a suitable time series object.
+The data that we are using from this report was accessed via the United States' National Oceanic and Atmospheric Administration website, where they house continually updated weekly $CO_{2}$ concentration data collected from the Mauna Loa observatory. This data was collected in a similar manner to the data in 1997 with a few key exceptions. The first key exception is that in 2019, the observatory installed a new $CO_{2}$ analyzer that measures $CO_{2}$ concentration (defined as the number of $CO_{2}$ molecules out of a random million atmospheric molecules, or parts per million (ppm)) via cavity-ring down spectroscopy versus the previously used infrared absorption. We are presuming that this change in analysis technique does not dramatically alter the concentration of $CO_{2}$. Another exception is that this dataset has a gap in December 1975: for the purposes of these analyses, we decided to fill all gaps using the previous $CO_{2}$ concentration gathered (e.g. we decided to use the $CO_{2}$ concentration taken on November 11, 1975 as the $CO_{2}$ values for all of the missing December 1975 datapoints). A final note about this data set is that in November 29, 2022 Mauna Loa erupted and thus all subsequent data points were collected at the Maunakea observatories, approximately 21 miles north of the Mauna Loa observatory. For ease and data consistency, we have decided to only use data through the end of 2022 in our models and forecasts (up to but not inlcuding the recent Maunakea observations).
 
 ```{r Fetch data from NOAA, eval=F, echo=FALSE}
 # change eval=T to run this for the first time, otherwise always load the (already saved) data
@@ -75,9 +73,7 @@ load('co2_data.RData')
 
 ## Historical Trends in Atmospheric Carbon 
 
-Conduct the same EDA on this data. Describe how the Keeling Curve evolved from 1997 to the present, noting where the series seems to be following similar trends to the series that you "evaluated in 1997" and where the series seems to be following different trends. This EDA can use the same, or very similar tools and views as you provided in your 1997 report.
-
-Atmospheric carbon is plotted in \autoref{fig:carbon}, and shows some worrying trends. Just look at how wobbly that line is. How is it possible that we are not living in a simulation, when the lines that plots monthly average $CO_{2}$ looks like this? 
+To begin, we conducted the same analysis on this dataset as was done in 1997, beginning with a map of the time series data, shown below in Figure 1, with a vertical red line at 1997 to reflect what new data we have compared to the previous report. 
 
 ```{r present time series, echo = FALSE}
 ts_co2_present <- tsibble::as_tsibble(co2_present)
@@ -87,16 +83,18 @@ p1_plot <- ggplot(ts_co2_present, aes(x = date, y = ppm)) +
   geom_line(color = 'steelblue') +
   geom_vline(xintercept = as.Date("1997-01-01"), color = "red") +
   labs(
-    title = "Figure 1", 
-    subtitle = TeX(r'(Weekly Mean $CO_2$ at Mauna Loa 1974-2023)'),
-    x = 'Month',
+    title = TeX(r'(Figure 1: Weekly Mean $CO_2$ at Mauna Loa 1974-2023)'),
+    subtitle = "A continuation of the Keeling Curve (red line denotes 1997)",
+    x = NULL,
     y = TeX(r'($CO_2$ parts per million)')
   ) + 
   scale_x_date(date_breaks = "1 year", date_labels = "%Y") + 
 	theme(axis.text.x=element_text(angle=90, vjust=0.5))
 p1_plot
 ```
+From this time series, we observe a steady continuation of the Keeling curve, with a continual increase in $CO_{2}$ concentration (ppm) as well as a notable seasonal component. The curve of the overall increasing $CO_{2}$ concentration, compared to data prior to 1997, does appear to be increasing at a slightly higher rate than what was previously observed.
 
+To more carefully compare the distrbution and autocorrelation aspects of this times series, we conducted further analysis, as shown below in Figure 2.
 
 ```{r present histogram ACF PACF, echo = FALSE}
 #histogram, ACF and PACF
@@ -123,41 +121,22 @@ p4_pacf <- ts_co2_present %>%
 (p2_histogram) /
   (p3_acf | p4_pacf)
 ```
-
-\begin{figure}
-  \includegraphics[width=.8\linewidth]{./figures/plot_1.pdf}
-  \caption{An uncareful plot.\label{fig:carbon}}
-  \begin{figurenotes}
-    After giving a declarative statement about what is in the plot, it is useful to provide a very concise interpretation of what you see, or how you read the plot. It should be possible for a reader to \textit{almost} read your entire report from tables, figures, and estimated models.
-  \end{figurenotes}
-\end{figure} 
-
+Figure 2 reveals that the present dataset recapitulates the behavior observed in the 1997 dataset. Similar to what was seen in 1997, there is a strong autocorrelation in $CO_{2}$ concentration with very mild decay, maintaining its strong correlation even after a lag of 30 weeks (Fig 2b). The partial autocorrelation, PACF plot, reveals a first correlation of almost 1 and some cyclical correlations that may correspond to the seasonality of the data (Fib 2c). Taken together, this analysis suggests that there is a seasonal and potentially autoregressive component to the data.
 
 # Models and Forecasts 
 
-Through our exploratory data analysis, we fond 
+Through our exploratory data analysis, we found that our weekly data from 1974-2022 appears to behave very similarly to the data that was analyzed in 1997. Stemming from this analysis, we move to specifically evaluating the best linear and ARIMA model from the 1997 report against this newer dataset.
 
 ## Comparing 1997 Linear Models 
 
-Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from a linear time model in 1997 (i.e. "Task 2a"). (You do not need to run any formal tests for this task.)
+To begin, we compared the best linear model from the 1997 report. In that report, we assessed four different models and determined that the quadratic model with a seasonal adjustment component most accurately described the data up to 1997. To compare this model, we forecasted this model 25 years in the future to encompass 2023, and graphed it against our current dataset, shown below in Figure 3. 
 
-To begin, we fit a model of the form: 
-
-\begin{equation}
-\label{eq:one}
-\text{CO}_{2} = \phi_{0} + \phi_{1} + \epsilon_{eit}
-\end{equation} 
-
-which, a student of the class will immediately realize is a nonsense model that is senseless. However, writing out the model form that you are going to estimate makes it very clear what you're assuming about the data generating process. It also allows you to reference what models your forecasts are being generated from. We will be expecting such a declaration in your reports. 
-
-We estimate best fitting parameters on this model in the following way, 
-
-```{r Load the fitted linear (quad) model}
+```{r Load the fitted linear (quad) model, warning = FALSE, echo = FALSE}
 load('1997_quad_seasonal_modelfit.RData') # loads a co2_quadratic_season var
 ```
 
 
-```{r Compare against the realised values}
+```{r Compare against the realised values, echo=FALSE}
 # 1. Forecast using the model until Dec 2022 (from 1997 = 25 years)
 dec2022.forecast.quad.model <- fabletools::forecast(co2_quadratic_season, h="25 years")
 
@@ -167,19 +146,19 @@ forecast.realised.plot <- ggplot() +
 	geom_line(data=co2_present, aes(date, ppm, color="Realised")) +
 	geom_line(data=dec2022.forecast.quad.model, aes(index.date, `.mean`, color="Forecast")) +
 	scale_x_date(date_breaks="1 year", date_labels = "%Y") +
-	scale_y_continuous(n.breaks=50) +
+	scale_y_continuous(n.breaks=25) +
 	theme(axis.text.x=element_text(angle=90, vjust=0.5)) +
-	labs(title="Quadratic model forecast vs realised values 1997-2022", x=NULL, y="CO2 ppm") +
+	labs(title="Figure 3: Quadratic model forecast vs realised values 1997-2022", x=NULL, y="CO2 ppm") +
 	scale_color_discrete(name = "Series")
 forecast.realised.plot
 ```
+Figure 3 reveals that the quadratic with seasonality model forecast fairly accurately predicts the actual data from 1997-2022. Up until about 2016, the 1997 model does seem to routinely over-predict the trough $CO_{2}$ values per yearand after 2016, the 1997 quadratic with seasonality model routinely under-predicts the peak $CO_{2}$ values per year. This suggests that while the quadratic model fits the data fairly closely, a model that combines several localized trends might better capture the data than a single overarching model.
 
 ## Comparing 1997 ARIMA Models 
 
 ```{r Load the ARIMA model}
 co2_arima_fit <- readRDS('1997_arima_modelfit.rds')
 ```
-
 
 ```{r Compare against the realised values}
 # 1. Forecast using the model until Dec 2022 (from 1997 = 25 years)
