@@ -1,6 +1,6 @@
 ---
 title: "Comparing Global $CO_{2}$ Emission Models from 1997 and Today"
-short: "What Keeling missed all these years"
+short: "A comparative follow up report"
 journal: "AER" # AER, AEJ, PP, JEL
 month: "`r format(Sys.Date(), '%m')`"
 year: "`r format(Sys.Date(), '%Y')`"
@@ -10,23 +10,14 @@ keywords:
   - Replication
   - Modern Science
 author:
-  - name: Majid Maki-Nayeri
-    firstname: Maki-Nayeri
-    surname: Maki-Nayeri
-    email: m_maki@ischool.berkeley.edu
-    affiliation: UC Berkeley, School of Information
-  - name: Vinod Bakthavachalam
-    firstname: Vinod
-    surname: Bakthavachalam
-    email: vinodb@ischool.berkeley.edu
-    affiliation: UC Berkeley, School of Information
-  - name: D. Alex Hughes
-    firstname: D. Alex 
-    surname: Hughes
-    email: dontatme@ischool.berkeley.edu
+  - name: Carolyn Dunlap
+  - name: Ayda Nayeb Nazar
+  - name: Qian Qiao
+  - name: Hector Rincon
 acknowledgements: | 
   The authors would like to thank their instructors from MIDS 271.
 abstract: | 
+  In 1997, our team analyzed the 
   The year is 1997 and global attention is turning toward the consequences of human-actions in our environmental system. The IPCC has been in existence and studying these trends for more than ten years, and has released its second assessment report in 1995. In this report, the IPCC notes that the balance of the evidence suggests that human-actions play a role in the changing climate. Although, there is little political will to change this activity, neither have global progressive and conservative politicians broken into clear partisan camps. Here, we assess data from the Mona Loa observatory to describe and predict global $CO_{2}$ concentrations under several possible scenarios. What we find, when we run the analysis, is going to be grim. 
 header-includes: 
   - '\usepackage{graphicx}'
@@ -34,48 +25,77 @@ header-includes:
 output: rticles::aea_article
 ---
 
-```{r note}
-## Students this file and the supporting files to create 
-## the document come from the `rticles` package. 
-## 
-## You're not required to write something using this template; 
-## and, you might think that it hampers understanding. That's 
-## totally fine. If you would like to see other tempates, 
-## you can install, the `rticles` package, and then use the
-## templates it provides. 
-## install.packages('rticles')
-## would do the trick. 
-```
-
-
 ```{r setup, echo=FALSE}
 ## default to not show code, unless we ask for it.
 knitr::opts_chunk$set(echo=FALSE)
 options(digits = 3)
 ```
 
+# Introduction 
 
-Understanding a changing climate, and what it means for the earth's inhabitants is of growing interest to the scientific and policy community. Although, at this point in 1997 it is not entirely clear what the consequences of this growing awareness will be, in this report we present likely outcomes under "business-as-usual" scenarios. In doing so, our hope, is to establish a series of possible futures, and, as evidence, technology, and policy develop over the coming decades, that we can weigh the impacts that carbon-emission reduction efforts might take. 
-
-# Background 
-## Carbon Emissions 
-What are are carbon emissions, and why should anyone care about them? In this section, we briefly review what is known about the relationship between the burning of fossil fuels, atmospheric $CO_{2}$, and the scientific community's growing understanding of the linkage between atmospheric $CO_{2}$ and global average temperatures. 
-
-Blah blah blah... 
+In this introduction, you can assume that your reader will have **just** read your 1997 report. In this introduction, **very** briefly pose the question that you are evaluating, and describe what (if anything) has changed in the data generating process between 1997 and the present.
 
 # Measurement and Data 
-## Measuring Atmospheric Carbon 
-Crucial to forecasting levels of atmospheric carbon is reliable measurement of this concept.\footnote{MIDS students: Think about this, for a moment. Suppose that you were to measure atmospheric carbon directly outside a steel-foundry in Michigan. How reliable a measurement of global atmospheric carbon do you think this would be? What if that were the only measure that you had, would you still propose to write this paper? I certainly hope not.} Several reference measurements have been proposed: Measurement 1 in Washington, DC; Measurement 2 in Bern Switzerland ... . In this study, we rely on ... 
+
+## (3 points) Task 1b: Create a modern data pipeline for Mona Loa CO2 data.
+The most current data is provided by the United States' National Oceanic and Atmospheric Administration, on a data page [[here](https://gml.noaa.gov/ccgg/trends/data.html)]. Gather the most recent weekly data from this page. (A group that is interested in even more data management might choose to work with the [hourly data](https://gml.noaa.gov/aftp/data/trace_gases/co2/in-situ/surface/mlo/co2_mlo_surface-insitu_1_ccgg_HourlyData.txt).)
+Create a data pipeline that starts by reading from the appropriate URL, and ends by saving an object called `co2_present` that is a suitable time series object.
 
 ## Historical Trends in Atmospheric Carbon 
 
+Conduct the same EDA on this data. Describe how the Keeling Curve evolved from 1997 to the present, noting where the series seems to be following similar trends to the series that you "evaluated in 1997" and where the series seems to be following different trends. This EDA can use the same, or very similar tools and views as you provided in your 1997 report.
+
 Atmospheric carbon is plotted in \autoref{fig:carbon}, and shows some worrying trends. Just look at how wobbly that line is. How is it possible that we are not living in a simulation, when the lines that plots monthly average $CO_{2}$ looks like this? 
 
-```{r first-co2-plot, results='hide'}
-# note, MIDS students, you've got to make something is more compelling than this
-pdf(file = './figures/plot_1.pdf', height=5, width=10)
-  plot(co2, type = 'l')
-dev.off()
+```{r present EDA, echo = FALSE}
+
+ts_co2_present <- tsibble::as_tsibble(co2_present)
+
+#time plot, histogram, ACF and PACF
+p1_plot <- ggplot(ts_co2_present, aes(x = date, y = ppm)) +
+  geom_line(color = 'steelblue') +
+  labs(
+    title = "Figure 1A", 
+    subtitle = TeX(r'(Weekly Mean $CO_2$ per Year)'),
+    x = 'Month',
+    y = TeX(r'($CO_2$ parts per million)')
+  )
+
+p2_histogram <- ts_co2_present %>%
+  ggplot(aes(x = ppm)) +
+  geom_histogram() +
+  labs(title = "Figure 1B", 
+    subtitle=TeX(r'(Histogram of Weekly Mean $CO_2$)'),
+        x = TeX(r'($CO_2$ parts per million)'))
+
+p3_acf <- ts_co2_present %>%
+  ACF(ppm) %>%
+  autoplot() +
+  labs(title = "Figure 1C", 
+    subtitle=TeX(r'(ACF of Weekly Mean $CO_2$)'))
+
+p4_pacf <- ts_co2_present %>%
+  PACF(ppm) %>%
+  autoplot() +
+  labs(title = "Figure 1D", 
+    subtitle=TeX(r'(PACF of Weekly Mean $CO_2$)'))
+
+
+#seasonal graph
+seasonal_graph <- ts_co2_present %>%
+  gg_season(ppm) +
+  labs(title = "Figure 2", 
+    subtitle = TeX(r'(Weekly Mean $CO_2$ per Year Seasonal Plot)'),
+    x = 'Month',
+    y = TeX(r'($CO_2$ parts per million)')
+  )
+
+#arranging plots
+p1_plot
+(p2_histogram) /
+  (p3_acf | p4_pacf)
+seasonal_graph
+
 ```
 
 \begin{figure}
@@ -103,9 +123,12 @@ Even more, a careful examination of \autoref{tab:table_1} suggests some worrying
 \end{table}
 
 # Models and Forecasts 
-While these plots might be compelling, it is often challenging to learn the exact nature of a time serires process from only these overview, "time vs. outcome" style of plots. In this section, we present evaluate two classes models to assess which time series model is most appropriate to use. 
 
-## Linear Models 
+Through our exploratory data analysis, we fond 
+
+## Comparing 1997 Linear Models 
+
+Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from a linear time model in 1997 (i.e. "Task 2a"). (You do not need to run any formal tests for this task.)
 
 To begin, we fit a model of the form: 
 
@@ -130,11 +153,16 @@ d <- data.frame(
 model_1 <- lm(y ~ x, data = d)
 ```
 
-## ARIMA Models 
+## Comparing 1997 ARIMA Models 
+
+Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from the ARIMA model that you fitted in 1997 (i.e. "Task 3a"). Describe how the Keeling Curve evolved from 1997 to the present.
 
 Sure we also fit some ARIMA models. And talk about them. 
 
-## Forecasts 
+## Evaluation of 1997 Forecasts 
+
+In 1997 you made predictions about the first time that CO2 would cross 420 ppm. How close were your models to the truth?
+After reflecting on your performance on this threshold-prediction task, continue to use the weekly data to generate a month-average series from 1997 to the present, and compare the overall forecasting performance of your models from Parts 2a and 3b over the entire period. (You should conduct formal tests for this task.)
 
 ```{r}
 prediction_1 <- predict(
@@ -146,6 +174,16 @@ prediction_1 <- predict(
 
 
 Because we have fitted a model, we can make predictions from that model. Our preferred model, named in \autoref{eq:one} is quite simple, and as you might notice, does not in fact match up with the model that we have fitted. However, from this model is is possible to reason about what the outcomes would be if the *input concept* were to be slightly ouside of the observed data range. In particular, if *input concept* were as high as $11$, then we would expect the *output concept* to be `r prediction_1[1,1]`, with a prediction interval that ranges from [`r prediction_1[1,2]`, `r prediction_1[1,3]`]
+
+# Training New Models Based on Present Data
+
+## (4 points) Task 5b: Train best models on present data
+Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) and non-seasonally-adjusted (NSA) series into training and test sets, using the last two years of observations as the test sets. For both SA and NSA series, fit ARIMA models using all appropriate steps. Measure and discuss how your models perform in-sample and (psuedo-) out-of-sample, comparing candidate models and explaining your choice. In addition, fit a polynomial time-trend model to the seasonally-adjusted series and compare its performance to that of your ARIMA model.
+
+# How Bad Could It Get?
+
+## (3 points) Task Part 6b: How bad could it get?
+With the non-seasonally adjusted data series, generate predictions for when atmospheric CO2 is expected to be at 420 ppm and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2122. How confident are you that these will be accurate predictions?
 
 # Conclusions 
 
