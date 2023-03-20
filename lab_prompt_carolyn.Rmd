@@ -11,7 +11,7 @@ output:
 In the 1950s, the geochemist Charles David Keeling observed a seasonal pattern in the amount of carbon dioxide present in air samples collected over the course of several years. He was able to attribute this pattern to the variation in global rates of photosynthesis throughout the year, caused by the difference in land area and vegetation cover between the Earth's northern and southern hemispheres.
 In 1958 Keeling began continuous monitoring of atmospheric carbon dioxide concentrations from the Mauna Loa Observatory in Hawaii and soon observed a trend increase carbon dioxide levels in addition to the seasonal cycle. He was able to attribute this trend increase to growth in global rates of fossil fuel combustion. This trend has continued to the present, and is known as the "Keeling Curve."
 
-```{r load packages, echo = FALSE, message = FALSE, warn=F}
+```{r load packages, echo = FALSE, message = FALSE, warning=F}
 library(tidyverse)
 library(tsibble)
 library(latex2exp)
@@ -21,6 +21,8 @@ library(feasts)
 library(forecast)
 library(sandwich)
 library(lmtest)
+library(tseries)
+library(fpp3)
 theme_set(theme_minimal())
 knitr::opts_chunk$set(dpi=1000)
 ```
@@ -29,7 +31,7 @@ knitr::opts_chunk$set(dpi=1000)
 tsibble::as_tsibble(co2) %>%
   ggplot() +
   aes(x=index, y=value) +
-  geom_line(color = 'steelblue') +
+  geom_line(color = 'cornflowerblue') +
   labs(
     title = TeX(r'(Monthly Mean $CO_2$)'),
     subtitle = 'The "Keeling Curve"',
@@ -167,7 +169,7 @@ load('co2_data.RData')
 ```{r Conduct the EDA}
 # co2_present %>% autoplot(ppm)
 ggplot(co2_present, aes(date, ppm)) +
-	geom_line() +
+	geom_line(colour="cornflowerblue") +
 	scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
 	theme(axis.text.x=element_text(angle=90, vjust=0.5)) +
 	labs(title="1955-2023 CO2 Mauna Loa weekly averages")
@@ -281,7 +283,7 @@ dec2022.forecast.quad.model %>% fabletools::accuracy(monthly.co2)
 
 ## (4 points) Task 5b: Train best models on present data
 
-Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) and non-seasonally-adjusted (NSA) series into training and test sets, using the last two years of observations as the test sets. For both SA and NSA series, fit ARIMA models using all appropriate steps. Measure and discuss how your models perform in-sample and (psuedo-) out-of-sample, comparing candidate models and explaining your choice. In addition, fit a polynomial time-trend model to the seasonally-adjusted series and compare its performance to that of your ARIMA model.
+Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) and non-seasonally-adjusted (NSA) series into training and test sets, using the last two years of observations as the test sets. For both SA and NSA series, fit ARIMA models using all appropriate steps. Measure and discuss how your models perform in-sample and (pseudo-) out-of-sample, comparing candidate models and explaining your choice. In addition, fit a polynomial time-trend model to the seasonally-adjusted series and compare its performance to that of your ARIMA model.
 
 
 1. Seasonally adjust data
@@ -315,15 +317,62 @@ train.diff.nsa <- train.df %>% mutate(diff = tsibble::difference(ppm, lag=1))
 PP.test(train.diff.nsa$diff[-1])
 adf.test(train.diff.nsa$diff[-1], alternative = "stationary")
 ```
+
 ```{r ARIMA models}
-autofit.arima.aic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
-autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
+train.df.ts <- select(train.df, week, ppm)
+# autofit.arima.aic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
+# autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
+autofit.arima.aic <- readRDS('autofit.arima.aic.nsa.rds')
+autofit.arima.bic <- readRDS('autofit.arima.bic.nsa.rds')
 autofit.arima.aic %>% report()
 autofit.arima.bic %>% report()
+
+train.df.ts.sa <- select(train.df, week, season_adjust)
+# autofit.arima.aic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
+# autofit.arima.bic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
+# saveRDS(autofit.arima.aic.sa, file="autofit.arima.aic.sa.Rds")
+# saveRDS(autofit.arima.bic.sa, file="autofit.arima.bic.sa.Rds")
+
+autofit.arima.aic.sa <- readRDS('autofit.arima.aic.sa.Rds')
+autofit.arima.bic.sa <- readRDS('autofit.arima.bic.sa.Rds')
+
+autofit.arima.aic.sa %>% report()
+autofit.arima.bic.sa %>% report()
 ```
 
 
+### Evaluating accuracy
 
+
+```{r In-sample}
+bind_cols(data.frame(
+	model=c('ARIMA(1,0,4)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)', 'ARIMA(1,0,2)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)'),
+	IC=c('AIC', 'AIC', 'BIC', 'BIC')
+	),
+bind_rows(
+	fabletools::accuracy(autofit.arima.aic),
+	fabletools::accuracy(autofit.arima.aic.sa),
+	fabletools::accuracy(autofit.arima.bic),
+	fabletools::accuracy(autofit.arima.bic.sa),
+))
+```
+
+
+```{r Out of sample NSA}
+# Using the ARIMA(1,0,2)(1,1,0) (chosen by AIC)
+nsa.fc <- fabletools::forecast(autofit.arima.bic,h="2 years")
+attr(autofit.arima.bic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
+nd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
+nd <- tsibble::fill_gaps(nd)
+attr(nd$week, "week_start") <- 7
+nd <- as_tsibble(nd)
+# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
+nsa.fc <- fabletools::forecast(autofit.arima.bic, h="2 years")
+nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
+```
+
+```{r Out of sample SA}
+```
 
 ## (3 points) Task Part 6b: How bad could it get?
 
