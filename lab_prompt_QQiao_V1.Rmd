@@ -300,7 +300,7 @@ Following all appropriate steps, choose an ARIMA model to fit to the series. Dis
 > From the EDA, we found the CO2 time series has obviously trend and seasonality. With the first differencing, the time series seems to be sationary based on the series plot. From the ACF plot, we can see seasonal fluctuations very 12 lags (months).   
 
 ```{r, warning=F}
-# co2_diff<- diff(co2)
+co2_diff <- diff(co2)
 # TODO: adjust labels
 
 # par(mfrow=c(2,2))
