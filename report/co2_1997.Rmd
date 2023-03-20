@@ -1,1 +1,413 @@
-You will fill this file with all of your work, from the point of view of 1997!
+---
+title: "Global $CO_{2}$ Emissions in 1997"
+short: "What Keeling missed all these years"
+journal: "AER" # AER, AEJ, PP, JEL
+month: "`r format(Sys.Date(), '%m')`"
+year: "`r format(Sys.Date(), '%Y')`"
+vol: 0
+issue: 0
+keywords:
+  - Replication
+  - Modern Science
+author:
+  - name: Carolyn Dunlap
+    firstname: Carolyn
+    surname: Dunlap
+    email: cadunlap@ischool.berkeley.edu
+    affiliation: UC Berkeley, School of Information
+  - name: Ayda Nayeb Nazar
+    firstname: Ayda
+    surname: Nayeb Nazar
+    email: ayda@ischool.berkeley.edu
+    affiliation: UC Berkeley, School of Information
+  - name: Qian Qiao
+    firstname: Qian
+    surname: Qiao
+    email: qianqiao@ischool.berkeley.edu
+    affiliation: UC Berkeley, School of Information
+  - name: Hector Rincon
+    firstname: Hector
+    surname: Rincon
+    email: hector@ischool.berkeley.edu
+    affiliation: UC Berkeley, School of Information
+acknowledgements: | 
+  The authors would like to thank their instructors from MIDS 271.
+abstract: | 
+  The year is 1997 and global attention is turning toward the consequences of human-actions in our environmental system. The IPCC has been in existence and studying these trends for more than ten years, and has released its second assessment report in 1995. In this report, the IPCC notes that the balance of the evidence suggests that human-actions play a role in the changing climate. Although, there is little political will to change this activity, neither have global progressive and conservative politicians broken into clear partisan camps. Here, we assess data from the Mona Loa observatory to describe and predict global $CO_{2}$ concentrations under several possible scenarios. What we find, when we run the analysis, is going to be grim. 
+header-includes: 
+  - '\usepackage{graphicx}'
+  - '\usepackage{booktabs}'
+output: rticles::aea_article
+---
+
+```{r setup, echo=FALSE}
+## default to not show code, unless we ask for it.
+library(tidyverse)
+library(tsibble)
+library(latex2exp)
+library(tsibble)
+library(lubridate)
+library(fable)
+library(forecast)
+library(dplyr)
+library(feasts)
+library(ggplot2)
+library(gridExtra)
+library(AICcmodavg)
+library(feasts)
+library(astsa)
+library(patchwork)
+library(tseries)
+theme_set(theme_minimal())
+knitr::opts_chunk$set(echo=FALSE)
+options(digits = 3)
+```
+
+Understanding a changing climate, and what it means for the earth's inhabitants is of growing interest to the scientific and policy community. Although, at this point in 1997 it is not entirely clear what the consequences of this growing awareness will be, in this report we present likely outcomes under "business-as-usual" scenarios. In doing so, our hope, is to establish a series of possible futures, and, as evidence, technology, and policy develop over the coming decades, that we can weigh the impacts that carbon-emission reduction efforts might take.
+
+# Background
+
+## Carbon Emissions
+
+What are are carbon emissions, and why should anyone care about them? In this section, we briefly review what is known about the relationship between the burning of fossil fuels, atmospheric $CO_{2}$, and the scientific community's growing understanding of the linkage between atmospheric $CO_{2}$ and global average temperatures.
+
+Blah blah blah...
+
+# Measurement and Data
+
+## Measuring Atmospheric Carbon
+
+Crucial to forecasting levels of atmospheric carbon is reliable measurement of this concept. Several reference measurements have been proposed: Measurement 1 in Washington, DC; Measurement 2 in Bern Switzerland ... . In this study, we rely on ...
+
+## Historical Trends in Atmospheric Carbon
+
+Atmospheric carbon is plotted in \autoref{fig:carbon}, and shows some worrying trends. Just look at how wobbly that line is. How is it possible that we are not living in a simulation, when the lines that plots monthly average $CO_{2}$ looks like this?
+
+```{r first-co2-plot, results='hide'}
+# note, MIDS students, you've got to make something is more compelling than this
+pdf(file = './figures/plot_1.pdf', height=5, width=10)
+  plot(co2, type = 'l')
+dev.off()
+```
+
+```{=tex}
+\begin{figure}
+  \includegraphics[width=.8\linewidth]{./figures/plot_1.pdf}
+  \caption{An uncareful plot.\label{fig:carbon}}
+  \begin{figurenotes}
+    After giving a declarative statement about what is in the plot, it is useful to provide a very concise interpretation of what you see, or how you read the plot. It should be possible for a reader to \textit{almost} read your entire report from tables, figures, and estimated models.
+  \end{figurenotes}
+\end{figure}
+```
+Even more, a careful examination of \autoref{tab:table_1} suggests some worrying trends in headings and columns.
+
+```{=tex}
+\begin{table}
+  \caption{What is happening with headers?\label{tab:table_1}}
+  \begin{tabular}{lll}
+    \toprule 
+    & Heading 1 & Heading 2 \\
+    Row 1 & 1 & 2 \\
+    Row 2 & 3 & 4 \\
+    \bottomrule
+  \end{tabular}
+  \begin{tablenotes}
+    Table notes environment without optional leadin.
+  \end{tablenotes}
+\end{table}
+```
+# Models and Forecasts
+
+While these plots might be compelling, it is often challenging to learn the exact nature of a time serires process from only these overview, "time vs. outcome" style of plots. In this section, we present evaluate two classes models to assess which time series model is most appropriate to use.
+
+## Linear Models
+
+We begin by fitting a simple linear model:
+
+```{=tex}
+\begin{equation}
+\label{eq:one}
+\text{CO}_{2} = \alpha + \beta t
+\end{equation}
+```
+which, a student of the class will immediately realize is a nonsense model that is senseless. However, writing out the model form that you are going to estimate makes it very clear what you're assuming about the data generating process. It also allows you to reference what models your forecasts are being generated from. We will be expecting such a declaration in your reports.
+
+We estimate best fitting parameters on this model in the following way,
+
+```{r loading data}
+ts_co2 <- as_tsibble(co2)
+```
+
+```{r Fitting the linear model, echo=TRUE}
+co2_reg <- ts_co2 %>% 
+	model(TSLM(value ~ trend())) %>%
+  report()
+```
+
+```{r linear model residuals}
+# TODO: Labels for plot
+co2_reg %>% gg_tsresiduals() 
+```
+
+```{r Fit the seasonalized model, echo=TRUE}
+# TODO: labels for plot
+co2_reg_season <- ts_co2 %>% 
+	model(TSLM(value ~ trend() + season())) %>% 
+	report()
+```
+
+```{r seasonalized model residulas}
+co2_reg_season %>% gg_tsresiduals() 
+```
+
+```{r Quad model, echo=TRUE}
+# Fit quadratic time trend model
+# TODO: labels for plot
+co2_quadratic <- ts_co2 %>% 
+	model(TSLM(value ~ trend() + I(trend()^2))) %>% 
+	report()
+```
+
+```{r Quad model residuals}
+co2_quadratic %>% gg_tsresiduals()
+```
+
+```{r Quad model with seasonality, echo=TRUE}
+co2_quadratic_season <- ts_co2 %>% 
+	model(TSLM(value ~ trend() + I(trend()^2) + season())) %>% 
+	report()
+```
+
+```{r Quad model with seasonality residuals}
+co2_quadratic_season %>% gg_tsresiduals() 
+```
+
+```{r, echo=FALSE,fig.height=6, fig.width=10}
+# TODO: adjust labels
+p1 <- augment(co2_reg)%>%
+  ggplot(aes(x = index)) +
+  geom_line(aes(y = value, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = "$CO_2$ parts per million",
+       title = "CO2 linear") 
+p2 <-augment(co2_reg_season)%>%
+  ggplot(aes(x = index)) +
+  geom_line(aes(y = value, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = "$CO_2$ parts per million",
+       title = "CO2 linear + seasonality")
+p3 <-augment(co2_quadratic)%>%
+  ggplot(aes(x = index)) +
+  geom_line(aes(y = value, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = "$CO_2$ parts per million",
+       title = "CO2 quadratic") 
+p4 <-augment(co2_quadratic_season)%>%
+  ggplot(aes(x = index)) +
+  geom_line(aes(y = value, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = "$CO_2$ parts per million",
+       title = "CO2 quadratic + seasonality") 
+grid.arrange(p1,p2,p3,p4, nrow = 2, ncol = 2)
+```
+> From the fitted value plots, we can see that the model co2_reg and co2_quadratic capture the trend quite well but do not capture the seasonal fluctuations. The quadratic model co2_quadratic did a better job than the linear model. 
+> Model co2_reg_season attempts to capture the seasonal effect; however, it underestimates the observed data.
+> Model co2_quadratic_season seems to do a good job capturing both trend and seasonal movement in the data.
+
+```{r Information criteria}
+# Compare the AIC, BIC btw linear model and quadratic model
+ic.m1 <- glance(co2_reg) %>%
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Linear")
+ic.m2 <- glance(co2_reg_season) %>%
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Linear + seasonality")
+ic.m3 <- glance(co2_quadratic) %>%
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Quadratic")
+ic.m4 <- glance(co2_quadratic_season) %>%
+  dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Quadratic + seasonality")
+rbind(ic.m1, ic.m2, ic.m3, ic.m4) %>% arrange(AICc, BIC)
+
+# TODO: are there any hypothesis tests we should be running here? [STRETCH]
+```
+
+> From the outputs above, the fourth model with both quadratic trend and seasonal variables is the best model becasue it has the lowest AIC, corrected AIC, or BIC score. 
+
+```{r Log transformation}
+# log transformation 
+ts_log_co2 <- ts_co2 %>% 
+      mutate(log_co2 = log(value))
+head(ts_log_co2)
+```
+
+```{r}
+log_co2_reg <- ts_log_co2 %>% 
+  model(TSLM(log_co2 ~ trend())) %>% 
+  report()
+log_co2_reg %>%
+gg_tsresiduals() 
+
+log_co2_reg_season <- ts_log_co2 %>% 
+  model(TSLM(log_co2 ~ trend()+ season())) %>% 
+  report()
+log_co2_reg_season %>%
+gg_tsresiduals() 
+
+log_co2_quadratic <- ts_log_co2 %>% 
+  model(TSLM(log_co2 ~ trend() + I(trend()^2))) %>% 
+  report()
+log_co2_quadratic %>%
+  gg_tsresiduals() 
+
+log_co2_quadratic_season<- ts_log_co2 %>% 
+  model(TSLM(log_co2 ~ trend() + I(trend()^2) +season())) %>% 
+  report()
+log_co2_quadratic_season %>%
+  gg_tsresiduals() 
+```
+> In the exploratory data analysis above, we did not observe a clear exponential trend in the CO2 data, and the variance did not appear to increase or decrease over time. Therefore, a logarithmic transformation may not be necessary for modeling the CO2 data. 
+
+```{r Forecast till 2020, echo=TRUE}
+# Create a forecast object based on the model and forecast to the year 2020
+# save(co2_quadratic_season, file='1997_quad_seasonal_modelfit.RData')
+quad.forecast <- fabletools::forecast(co2_quadratic_season, h = "23 years")
+# Forecast + previous data graph
+forecast.graph <- quad.forecast %>% autoplot(ts_co2) + labs(title="Linear model forecast 1997-2020", x=NULL, y="Monthly mean CO2 ppm")
+forecast.graph
+```
+
+## ARIMA Models
+
+> From the EDA, we found the CO2 time series has obvious trend and seasonality. With the first differencing, the time series seems to be sationary based on the time series plot. From the ACF plot, we can see seasonal fluctuations every 12 lags (months).
+
+```{r, warning=F}
+co2_diff <- diff(co2)
+co2_diff2 <- ts_co2 %>%
+	gg_tsdisplay(difference(value, 12) %>% difference(),
+				 plot_type='partial', lag=36) +
+	labs(title="Seasonally Differenced", y="")
+co2_diff2
+```
+
+```{r Run the PP and ADF tests, warning=F, echo=TRUE}
+PP.test(co2_diff)
+adf.test(co2_diff, alternative = "stationary")
+```
+> Both Phillips Perron Test and Augmented Dickey Fuller (ADF) Tests show a p-value that is lower than 0.05 so we reject the null hypothesis that this the series is non-stationary. Thus, the time series with the first difference is stationary. We can start to build the model with 1 difference. 
+
+```{r Fit the ARIMA models}
+fit <-  ts_co2 %>%
+	model(
+		arima111000 = ARIMA(value ~ pdq(1,1,1) + PDQ(0,0,0)),
+		arima121000 = ARIMA(value ~ pdq(1,2,1) + PDQ(0,0,0)),
+		arima214000 = ARIMA(value ~ pdq(2,1,4) + PDQ(0,0,0)),
+		arima012011 = ARIMA(value ~ pdq(0,1,2) + PDQ(0,1,1)),
+		arima210011 = ARIMA(value ~ pdq(2,1,0) + PDQ(0,1,1)),
+		arima111112 = ARIMA(value ~ pdq(1,1,1) + PDQ(1,1,2)),
+		auto = ARIMA(value, stepwise = FALSE, approx = FALSE)
+  )
+```
+
+```{r arima models table, echo=TRUE}
+fit %>%
+  report() %>% arrange(AIC) %>% select(-ar_roots, -ma_roots)
+```
+
+```{r Best ARIMA model specs, echo=TRUE}
+fit$auto[[1]]$fit$spec %>% knitr::kable()
+fit$auto[[1]]$fit$model
+```
+
+> Based on the AIC, AICc, BIC scores, The auto model (ARIMA(0,1,3),(0,1,1)(12)) have the lowest AIC and AICc and model (ARIMA(0,1,2),(0,1,1)(12)) has the lowest BIC. In this case,(ARIMA(0,1,3),(0,1,1)(12)) is the best fit model. 
+## TODO: why? We might choose based on BIC
+
+```{r Best ARIMA model residual}
+arima013011 <- ts_co2 %>%
+  model(arima013011 = ARIMA(value ~ pdq(0,1,3) + PDQ(0,1,1)) )
+# Create diagnostic plots for the residuals
+arima013011%>%
+  gg_tsresiduals() 
+```
+
+```{r Save the ARIMA model to use in the other report}
+saveRDS(arima013011, '1997_arima_modelfit.rds')
+```
+
+> The residuals time series plot shows a flat mean at 0, and only one lag in the acf plot is significant, and the residuals are normally distributed. Thus, the model (ARIMA(0,1,3),(0,1,1)(12)) fits the CO2 data well. 
+
+```{r Ljung Box test, echo=TRUE}
+augment(arima013011) %>%
+	features(.resid, ljung_box, lag = 10, dof = 0)
+```
+> From the Ljung Box test, we got a large p-value that failed to reject the null hypothesis. This indicates that the residuals from the model arima013011 are randomly distributed, thus this is a good model fit. 
+
+```{r ARIMA forecast plot, warning=F}
+arima_forecast <- fabletools::forecast(arima013011, h = "103 years", level = c(80, 95)) # all the way to 2100 (1997 + 103 = 2100)
+arima_forecast_plot <- arima_forecast %>%
+	autoplot(colour="cornflowerblue") + 
+	autolayer(ts_co2, colour="black") + 
+	geom_line(data=arima013011 %>% 
+			  	augment(), aes(index,.fitted,color=.model)) + 
+	facet_wrap(~.model, ncol=1, nrow=3) +
+	geom_hline(yintercept = 420, color="steelblue") +
+	geom_hline(yintercept = 500, color="steelblue") +
+	labs(title="ARIMA(0,1,3)(0,1,1) forecast 1997-2100", y="Monthly mean CO2 ppm", x = NULL) +
+	scale_x_yearmonth(date_breaks = "5 year", date_labels = "%Y")
+arima_forecast_plot
+# accuracy(arima_forecast, ts_co2)
+```
+
+## Forecasts
+
+```{r Produce the 420 and 500 thresholds table}
+# 420
+forecast.420 <- arima_forecast %>% filter(.mean >= 420 & .mean < 421) %>% hilo()
+first.420 <- head(select(forecast.420, `80%`, `95%`, .mean), 1)
+last.420 <- tail(select(forecast.420, `80%`, `95%`, .mean), 1)
+# 500
+forecast.500 <- arima_forecast %>% filter(.mean >= 500 & .mean < 501) %>% hilo()
+first.500 <- head(select(forecast.500, `80%`, `95%`, .mean), 1)
+last.500 <- tail(select(forecast.500, `80%`, `95%`, .mean), 1)
+values.420 <- data.frame(bind_rows(first.420, last.420))
+values.420$target <- 420
+values.420 <- mutate(values.420,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+values.500 <- data.frame(bind_rows(first.500, last.500))
+values.500 <- mutate(values.500,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+values.500$target <- 500
+forecast.thresholds <- bind_rows(values.420, values.500) %>% select(target, index, .mean, starts_with('ci'))
+# TODO: change the col names
+forecast.thresholds	%>% knitr::kable()
+```
+```{r 2100 data, warning=F, echo=TRUE}
+values.2100 <- filter(arima_forecast, index >= as.Date('2100-01-01')) %>% hilo() %>% data.frame()
+mutate(values.2100,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.) %>% select(index, .mean, starts_with('ci')) %>% knitr::kable()
+```
+
+Because we have fitted a model, we can make predictions from that model. Our preferred model, named in \autoref{eq:one} is quite simple, and as you might notice, does not in fact match up with the model that we have fitted. However, from this model is is possible to reason about what the outcomes would be if the *input concept* were to be slightly ouside of the observed data range. In particular, if *input concept* were as high as $11$, then we would expect the *output concept* to be `r prediction_1[1,1]`, with a prediction interval that ranges from [`r prediction_1[1,2]`, `r prediction_1[1,3]`]
+
+# Conclusions
+
+What to conclude is unclear.
+
+```{=tex}
+\bibliographystyle{aea}
+\bibliography{references}
+```
+```{=tex}
+\appendix
+\section{Appendix: Model Robustness}
+```
+While the most plausible model that we estimate is reported in the main, "Modeling" section, in this appendix to the article we examine alternative models. Here, our intent is to provide a skeptic that does not accept our assessment of this model as an ARIMA of order (1,2,3) an understanding of model forecasts under alternative scenarios.
