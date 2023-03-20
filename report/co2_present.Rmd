@@ -31,6 +31,20 @@ knitr::opts_chunk$set(echo=FALSE)
 options(digits = 3)
 ```
 
+```{r load packages, echo = FALSE, message = FALSE}
+library(tidyverse)
+library(tsibble)
+library(latex2exp)
+library(patchwork)
+library(lubridate)
+library(feasts)
+library(forecast)
+library(sandwich)
+library(lmtest)
+theme_set(theme_minimal())
+knitr::opts_chunk$set(dpi=1000)
+```
+
 # Introduction 
 
 In this introduction, you can assume that your reader will have **just** read your 1997 report. In this introduction, **very** briefly pose the question that you are evaluating, and describe what (if anything) has changed in the data generating process between 1997 and the present.
@@ -41,61 +55,73 @@ In this introduction, you can assume that your reader will have **just** read yo
 The most current data is provided by the United States' National Oceanic and Atmospheric Administration, on a data page [[here](https://gml.noaa.gov/ccgg/trends/data.html)]. Gather the most recent weekly data from this page. (A group that is interested in even more data management might choose to work with the [hourly data](https://gml.noaa.gov/aftp/data/trace_gases/co2/in-situ/surface/mlo/co2_mlo_surface-insitu_1_ccgg_HourlyData.txt).)
 Create a data pipeline that starts by reading from the appropriate URL, and ends by saving an object called `co2_present` that is a suitable time series object.
 
+```{r Fetch data from NOAA, eval=F, echo=FALSE}
+# change eval=T to run this for the first time, otherwise always load the (already saved) data
+noaa_colnames <- c('year', 'month', 'day', 'decimal', 'ppm', 'n.days', 'lag.1Y', 'lag.10Y', 'delta.1800')
+co2_present <- read_table('https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_weekly_mlo.txt', skip = 53, col_names = noaa_colnames, na="-999.99")
+co2_present <- mutate(co2_present, date = as.Date(paste(year, month, day, sep="-"))) %>% mutate(week = yearweek(date, week_start=7)) # start week on Sunday
+co2_present <- select(co2_present, -decimal, -delta.1800, -year, -month, -day)
+
+# Create the tsibble
+co2_present <- as_tsibble(co2_present, index=week)
+
+# Save the data
+save(co2_present, file='co2_data.RData')
+```
+
+```{r Load the data, eval=T, echo=FALSE}
+load('co2_data.RData')
+```
+
 ## Historical Trends in Atmospheric Carbon 
 
 Conduct the same EDA on this data. Describe how the Keeling Curve evolved from 1997 to the present, noting where the series seems to be following similar trends to the series that you "evaluated in 1997" and where the series seems to be following different trends. This EDA can use the same, or very similar tools and views as you provided in your 1997 report.
 
 Atmospheric carbon is plotted in \autoref{fig:carbon}, and shows some worrying trends. Just look at how wobbly that line is. How is it possible that we are not living in a simulation, when the lines that plots monthly average $CO_{2}$ looks like this? 
 
-```{r present EDA, echo = FALSE}
-
+```{r present time series, echo = FALSE}
 ts_co2_present <- tsibble::as_tsibble(co2_present)
 
-#time plot, histogram, ACF and PACF
+#time plot
 p1_plot <- ggplot(ts_co2_present, aes(x = date, y = ppm)) +
   geom_line(color = 'steelblue') +
+  geom_vline(xintercept = as.Date("1997-01-01"), color = "red") +
   labs(
-    title = "Figure 1A", 
-    subtitle = TeX(r'(Weekly Mean $CO_2$ per Year)'),
+    title = "Figure 1", 
+    subtitle = TeX(r'(Weekly Mean $CO_2$ at Mauna Loa 1974-2023)'),
     x = 'Month',
     y = TeX(r'($CO_2$ parts per million)')
-  )
+  ) + 
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") + 
+	theme(axis.text.x=element_text(angle=90, vjust=0.5))
+p1_plot
+```
 
+
+```{r present histogram ACF PACF, echo = FALSE}
+#histogram, ACF and PACF
 p2_histogram <- ts_co2_present %>%
   ggplot(aes(x = ppm)) +
   geom_histogram() +
-  labs(title = "Figure 1B", 
+  labs(title = "Figure 2a", 
     subtitle=TeX(r'(Histogram of Weekly Mean $CO_2$)'),
         x = TeX(r'($CO_2$ parts per million)'))
 
 p3_acf <- ts_co2_present %>%
   ACF(ppm) %>%
   autoplot() +
-  labs(title = "Figure 1C", 
+  labs(title = "Figure 2b", 
     subtitle=TeX(r'(ACF of Weekly Mean $CO_2$)'))
 
 p4_pacf <- ts_co2_present %>%
   PACF(ppm) %>%
   autoplot() +
-  labs(title = "Figure 1D", 
+  labs(title = "Figure 2c", 
     subtitle=TeX(r'(PACF of Weekly Mean $CO_2$)'))
 
-
-#seasonal graph
-seasonal_graph <- ts_co2_present %>%
-  gg_season(ppm) +
-  labs(title = "Figure 2", 
-    subtitle = TeX(r'(Weekly Mean $CO_2$ per Year Seasonal Plot)'),
-    x = 'Month',
-    y = TeX(r'($CO_2$ parts per million)')
-  )
-
 #arranging plots
-p1_plot
 (p2_histogram) /
   (p3_acf | p4_pacf)
-seasonal_graph
-
 ```
 
 \begin{figure}
@@ -106,21 +132,6 @@ seasonal_graph
   \end{figurenotes}
 \end{figure} 
 
-Even more, a careful examination of \autoref{tab:table_1} suggests some worrying trends in headings and columns. 
-
-\begin{table}
-  \caption{What is happening with headers?\label{tab:table_1}}
-  \begin{tabular}{lll}
-    \toprule 
-    & Heading 1 & Heading 2 \\
-    Row 1 & 1 & 2 \\
-    Row 2 & 3 & 4 \\
-    \bottomrule
-  \end{tabular}
-  \begin{tablenotes}
-    Table notes environment without optional leadin.
-  \end{tablenotes}
-\end{table}
 
 # Models and Forecasts 
 
@@ -140,20 +151,53 @@ To begin, we fit a model of the form:
 which, a student of the class will immediately realize is a nonsense model that is senseless. However, writing out the model form that you are going to estimate makes it very clear what you're assuming about the data generating process. It also allows you to reference what models your forecasts are being generated from. We will be expecting such a declaration in your reports. 
 
 We estimate best fitting parameters on this model in the following way, 
-```{r make fake data}
-## We wouldn't show this in a report.
-d <- data.frame(
-  y=1:10 + rnorm(n=10), 
-  x=2:11
-)
-## But we would show the next chunk. 
+
+```{r Load the fitted linear (quad) model}
+load('1997_quad_seasonal_modelfit.RData') # loads a co2_quadratic_season var
 ```
 
-```{r estimate a model, echo=TRUE}
-model_1 <- lm(y ~ x, data = d)
+
+```{r Compare against the realised values}
+# 1. Forecast using the model until Dec 2022 (from 1997 = 25 years)
+dec2022.forecast.quad.model <- fabletools::forecast(co2_quadratic_season, h="25 years")
+
+# 2. Plot the forecast + realised values
+dec2022.forecast.quad.model <- dec2022.forecast.quad.model %>% mutate(index.date = as.Date(index))
+forecast.realised.plot <- ggplot() +
+	geom_line(data=co2_present, aes(date, ppm, color="Realised")) +
+	geom_line(data=dec2022.forecast.quad.model, aes(index.date, `.mean`, color="Forecast")) +
+	scale_x_date(date_breaks="1 year", date_labels = "%Y") +
+	scale_y_continuous(n.breaks=50) +
+	theme(axis.text.x=element_text(angle=90, vjust=0.5)) +
+	labs(title="Quadratic model forecast vs realised values 1997-2022", x=NULL, y="CO2 ppm") +
+	scale_color_discrete(name = "Series") +
+	geom_hline(yintercept=420, colour="red") + 
+	geom_vline(xintercept=as.Date("2022-01-01"), colour="red")
+forecast.realised.plot
 ```
 
 ## Comparing 1997 ARIMA Models 
+
+```{r Load the ARIMA model}
+co2_arima_fit <- readRDS('1997_arima_modelfit.rds')
+```
+
+
+```{r Compare against the realised values}
+# 1. Forecast using the model until Dec 2022 (from 1997 = 25 years)
+dec2022.forecast.arima.model <- fabletools::forecast(co2_arima_fit, h="25 years")
+
+# 2. Plot the forecast + realised values
+dec2022.forecast.arima.model <- dec2022.forecast.arima.model %>% mutate(index.date = as.Date(index))
+arima.forecast.realised.plot <- ggplot() +
+	geom_line(data=co2_present, aes(date, ppm, color="Realised")) +
+	geom_line(data=dec2022.forecast.arima.model, aes(index.date, `.mean`, color="Forecast")) +
+	scale_x_date(date_breaks="1 year", date_labels = "%Y") +
+	theme(axis.text.x=element_text(angle=90, vjust=0.5)) +
+	labs(title="ARIMA model forecast vs realised values 1997-2022", x=NULL, y="CO2 ppm") +
+	scale_color_discrete(name = "Series")
+arima.forecast.realised.plot
+```
 
 Descriptively compare realized atmospheric CO2 levels to those predicted by your forecast from the ARIMA model that you fitted in 1997 (i.e. "Task 3a"). Describe how the Keeling Curve evolved from 1997 to the present.
 
@@ -164,12 +208,35 @@ Sure we also fit some ARIMA models. And talk about them.
 In 1997 you made predictions about the first time that CO2 would cross 420 ppm. How close were your models to the truth?
 After reflecting on your performance on this threshold-prediction task, continue to use the weekly data to generate a month-average series from 1997 to the present, and compare the overall forecasting performance of your models from Parts 2a and 3b over the entire period. (You should conduct formal tests for this task.)
 
-```{r}
-prediction_1 <- predict(
-  object = model_1, 
-  newdata = data.frame(x=11), 
-  interval = 'prediction'
-)
+```{r Produce the monthly series}
+monthly.co2 <- co2_present %>%
+	index_by(month = yearmonth(week)) %>%
+	summarise(ppm = mean(ppm, na.rm=T)) %>%
+	tidyr::fill(ppm, .direction = "down") %>%
+	mutate(index.date = as.Date(month))
+```
+
+```{r Plot the monthly series against the forecast}
+p1 <- ggplot() +
+	geom_line(data=monthly.co2, aes(index.date, ppm, color="Realised")) +
+	geom_line(data=dec2022.forecast.arima.model, aes(index.date, `.mean`, color="Forecast - ARIMA")) +
+	geom_line(data=dec2022.forecast.quad.model, aes(index.date, `.mean`, color="Forecast - Quadratic")) +
+	# geom_point(data=monthly.co2, aes(index.date, ppm, color="Realised")) +
+	scale_x_date(date_breaks="1 year", date_labels = "%Y") +
+	theme(axis.text.x=element_text(angle=90, vjust=0.5)) +
+	labs(title="ARIMA model forecast vs quadratic model forecast vs realised values 1997-2022", x=NULL, y="CO2 ppm") +
+	scale_color_discrete(name = "Series")
+p1
+```
+
+```{r Change the names to match the forecast}
+names(monthly.co2) <- c('index', 'value', 'index.date')
+```
+
+
+```{r Running the tests for comparison}
+dec2022.forecast.arima.model %>% fabletools::accuracy(monthly.co2)
+dec2022.forecast.quad.model %>% fabletools::accuracy(monthly.co2)
 ```
 
 
@@ -180,6 +247,86 @@ Because we have fitted a model, we can make predictions from that model. Our pre
 ## (4 points) Task 5b: Train best models on present data
 Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) and non-seasonally-adjusted (NSA) series into training and test sets, using the last two years of observations as the test sets. For both SA and NSA series, fit ARIMA models using all appropriate steps. Measure and discuss how your models perform in-sample and (psuedo-) out-of-sample, comparing candidate models and explaining your choice. In addition, fit a polynomial time-trend model to the seasonally-adjusted series and compare its performance to that of your ARIMA model.
 
+```{r Seasonally adjust data}
+# There are missing values, so we have to fill in the blanks (fill with the previous week value)
+
+co2_present <- co2_present %>% tidyr::fill(ppm, .direction = "down")
+dcmp_add <- co2_present %>% model(stl=STL(ppm))
+co2_present.components <- components(dcmp_add)
+```
+
+```{r Split train/test}
+test.df <- filter(co2_present.components, year(week) >= 2020 & year(week) < 2023)
+train.df <- filter(co2_present.components, year(week) < 2020)
+```
+
+```{r Seasonally adjusted data tests for stationarity}
+train.diff.sa <- train.df %>% mutate(diff = tsibble::difference(season_adjust, lag=1))
+PP.test(train.diff.sa$diff[-1])
+adf.test(train.diff.sa$diff[-1], alternative = "stationary")
+```
+
+```{r Non-seasonally adjusted data tests for stationarity}
+train.diff.nsa <- train.df %>% mutate(diff = tsibble::difference(ppm, lag=1))
+PP.test(train.diff.nsa$diff[-1])
+adf.test(train.diff.nsa$diff[-1], alternative = "stationary")
+```
+
+```{r ARIMA models}
+train.df.ts <- select(train.df, week, ppm)
+# autofit.arima.aic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
+# autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
+autofit.arima.aic <- readRDS('autofit.arima.aic.nsa.rds')
+autofit.arima.bic <- readRDS('autofit.arima.bic.nsa.rds')
+autofit.arima.aic %>% report()
+autofit.arima.bic %>% report()
+
+train.df.ts.sa <- select(train.df, week, season_adjust)
+# autofit.arima.aic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
+# autofit.arima.bic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
+# saveRDS(autofit.arima.aic.sa, file="autofit.arima.aic.sa.Rds")
+# saveRDS(autofit.arima.bic.sa, file="autofit.arima.bic.sa.Rds")
+
+autofit.arima.aic.sa <- readRDS('autofit.arima.aic.sa.Rds')
+autofit.arima.bic.sa <- readRDS('autofit.arima.bic.sa.Rds')
+
+autofit.arima.aic.sa %>% report()
+autofit.arima.bic.sa %>% report()
+```
+
+### Evaluating accuracy
+
+
+```{r In-sample}
+bind_cols(data.frame(
+	model=c('ARIMA(1,0,4)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)', 'ARIMA(1,0,2)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)'),
+	IC=c('AIC', 'AIC', 'BIC', 'BIC')
+	),
+bind_rows(
+	fabletools::accuracy(autofit.arima.aic),
+	fabletools::accuracy(autofit.arima.aic.sa),
+	fabletools::accuracy(autofit.arima.bic),
+	fabletools::accuracy(autofit.arima.bic.sa),
+))
+```
+
+
+```{r Out of sample NSA}
+# Using the ARIMA(1,0,2)(1,1,0) (chosen by AIC)
+nsa.fc <- fabletools::forecast(autofit.arima.bic,h="2 years")
+attr(autofit.arima.bic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
+nd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
+nd <- tsibble::fill_gaps(nd)
+attr(nd$week, "week_start") <- 7
+nd <- as_tsibble(nd)
+# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
+nsa.fc <- fabletools::forecast(autofit.arima.bic, h="2 years")
+nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
+```
+
+```{r Out of sample SA}
+```
+
 # How Bad Could It Get?
 
 ## (3 points) Task Part 6b: How bad could it get?
@@ -188,13 +335,5 @@ With the non-seasonally adjusted data series, generate predictions for when atmo
 # Conclusions 
 
 What to conclude is unclear. 
-
-\bibliographystyle{aea}
-\bibliography{references}
-
-\appendix
-\section{Appendix: Model Robustness}
-
-While the most plausible model that we estimate is reported in the main, "Modeling" section, in this appendix to the article we examine alternative models. Here, our intent is to provide a skeptic that does not accept our assessment of this model as an ARIMA of order (1,2,3) an understanding of model forecasts under alternative scenarios. 
 
 
