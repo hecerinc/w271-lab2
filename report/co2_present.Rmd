@@ -277,7 +277,7 @@ autofit.arima.aic %>% report()
 autofit.arima.bic %>% report()
 ```
 
-For the NSA data, we fit two ARMIA models, ARIMA(1,0,4)(1,1,0)[52] 
+For the NSA data, we fit two ARMIA models, ARIMA(1,0,4)(1,1,0)[52] based on the best (lowest) AIC (AIC = 3377) and ARIMA(1,0,2)(1,1,0)[52] based on the best (lowest) BIC (BIC = 3423) from all permutations of ARIMA models with up to 10 autoregressive processes, 2 unit roots differences, 10 moving average processes, and the equivalent in seasonality components. We used similar techniques to fit the SA data, and found that the same ARIMA model, ARIMA(0,1,2)(1,0,0)[52], had the lowest AIC (AIC = 1841) and BIC (BIC = 1870) for the SA data (model shown below).
 
 ```{r ARIMA models SA data}
 train.df.ts.sa <- select(train.df, week, season_adjust)
@@ -292,8 +292,7 @@ autofit.arima.bic.sa <- readRDS('autofit.arima.bic.sa.Rds')
 autofit.arima.aic.sa %>% report()
 #autofit.arima.bic.sa %>% report()
 ```
-
-
+For each of these models, we evaluated the model accuracy against the training (in-sample) and test (out-sample) data sets.
 
 ### Evaluating accuracy
 
@@ -309,7 +308,7 @@ bind_rows(
 	fabletools::accuracy(autofit.arima.bic),
 	fabletools::accuracy(autofit.arima.bic.sa),
 )) %>%
-  knitr::kable()
+  knitr::kable(caption = "Table 2: Evaluating ARIMA model accuracy for present data")
 ```
 
 
