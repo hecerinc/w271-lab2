@@ -318,41 +318,61 @@ To evaluate our chosen ARIMA models further, we used each model (for NSA and SA 
 
 ```{r Out of sample NSA and SA accuracy}
 #NSA
-# Using the ARIMA(1,0,4)(1,1,0) (chosen by AIC)
-nsa.fc <- fabletools::forecast(autofit.arima.aic,h="2 years")
-attr(autofit.arima.aic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
-nd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
-nd <- tsibble::fill_gaps(nd)
-attr(nd$week, "week_start") <- 7
-nd <- as_tsibble(nd)
-# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
-nsa.fc <- fabletools::forecast(autofit.arima.aic, h="2 years")
+# Using the ARIMA(1,0,4)(1,1,0) (chosen by in-sample accuracy data)
+nsa.fc <- fabletools::forecast(autofit.arima.bic, h="2 years")
 nsa.accuracy.forecast <- nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
 
 #SA
 # Using the ARIMA(1,0,2)(1,1,0) (only model for SA data)
-sa.fc <- fabletools::forecast(autofit.arima.aic.sa,h="2 years")
-attr(autofit.arima.aic.sa$auto[[1]]$fit$tsp$range, 'week_start') <- 7
-sd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
-sd <- tsibble::fill_gaps(sd)
-attr(sd$week, "week_start") <- 7
-sd <- as_tsibble(sd)
-# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
-sa.fc <- fabletools::forecast(autofit.arima.aic.sa, h="2 years")
-sa.accuracy.forecast <- sa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
+sa.fc <- fabletools::forecast(autofit.arima.bic.sa, h="2 years")
+sa.accuracy.forecast <- sa.fc %>% fabletools::accuracy(select(test.df, week, season_adjust))
+```
 
-rbind(nsa.accuracy.forecast, sa.accuracy.forecast) %>% 
-  select(.model, ME, RMSE, MAE, MPE, MAPE, MASE, RMSSE, ACF1) %>%
+```{r table 3, echo=FALSE}
+bind_cols(data.frame(
+	model=c('ARIMA(1,0,4)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)')),
+bind_rows(
+	nsa.accuracy.forecast, sa.accuracy.forecast
+)) %>%
+  select(model, ME, RMSE, MAE, MPE, MAPE, ACF1) %>%
   knitr::kable(caption = "Table 3: Present ARIMA Model Forecasting Accuracy 2020-2022")
 ```
 
-```{r Out of sample SA}
-```
+Based on Table 3, our ARIMA model for non-seasonally adjusted data outperforms our ARIMA model for seasonally adjusted data in all metrics. 
 
 ## Polynomial Model
 
+Because in 1997, we observed that the quadratic model outperfromed the ARIMA model, we also wanted to look at the forecasting accuracy of a polynomial model on the seasonally adjusted weekly $CO_{2}$ concentration data and compare that to our ARIMA forecasts. We fit a quadratic model on the seasonally adjusted data, and show the model outputs and residuals below.
+
+```{r Poly-time trend model to SA}
+sa.poly.fit <- train.df.ts.sa %>% model(TSLM(season_adjust ~ trend() + I(trend()^2)))
+sa.poly.fit %>% report()
+```
+
+```{r ply-time trend residuals, echo=FALSE}
+sa.poly.fit %>% gg_tsresiduals()
+```
+Based on plotting the residuals, we do see a normal distribution of residuals but still have high autocorrelation, suggesting that the residuals from the polynomial model is not a white noise process and we are still not encapsulating some trends with the polynomial model on the seasonally adjusted data alone. We also saw this in 1997, which is what led us to choose an ARIMA model for forecasting then as well.
+
 ### Evaluating Accuracy
 
+To evaluate the accuracy of forecasting, we compared the accuracy of the polynomial model and the ARIMA model for seasonally adjusted data against our 2020-2022 test dataset, as shown in Table 4 below. 
+
+```{r Test accuracy of SA poly model}
+sa.poly.fc <- fabletools::forecast(sa.poly.fit, h="2 years")
+sa.poly.accuracy <- sa.poly.fc %>% fabletools::accuracy(select(test.df, week, season_adjust)) 
+```
+
+```{r Test accuracy table SA poly model, echo=FALSE}
+bind_cols(data.frame(
+  model=c('TSLM(season_adjust ~ trend() + I(trend()^2))', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)')),
+  bind_rows(
+    sa.poly.accuracy, sa.accuracy.forecast)) %>%
+  select(model, ME, RMSE, MAE, MPE, MAPE, ACF1) %>%
+  knitr::kable(caption = "Table 4: Present SA Models Forecasting Accuracy 2020-2022")
+```
+
+Based on Table 4, we do see that our ARIMA model outperforms our polynomial model, which gives us confidence to move forward with future predictions using the ARIMA model with this current dataset.
 
 # How Bad Could It Get?
 
