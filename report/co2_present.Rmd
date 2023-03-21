@@ -296,6 +296,7 @@ For each of these models, we evaluated the model accuracy against the training (
 
 ### Evaluating accuracy
 
+To evaluate the ARIMA models, we first assessed each model (the best model via AIC or BIC for either the NSA or SA data sets) accuracy against the training data provided, which is described in Table 2 below.
 
 ```{r In-sample}
 bind_cols(data.frame(
@@ -308,21 +309,41 @@ bind_rows(
 	fabletools::accuracy(autofit.arima.bic),
 	fabletools::accuracy(autofit.arima.bic.sa),
 )) %>%
-  knitr::kable(caption = "Table 2: Evaluating ARIMA model accuracy for present data")
+  knitr::kable(caption = "Table 2: Evaluating ARIMA model accuracy for present data (Training Data)")
 ```
 
+Based on the in-sample accuracy comparisons, for non seasonally adjusted data, we chose the ARIMA(1,0,4)(1,1,0) model because it had slightly better (lower) root mean squared error and ACF1 compared to the other ARIMA model (ARIMA(1,0,2)(1,1,0)). For the seasonally adjusted data, we only had one ARIMA model, ARIMA(0,1,2)(1,0,0), and use that model for out-sample evaluation.
 
-```{r Out of sample NSA}
-# Using the ARIMA(1,0,2)(1,1,0) (chosen by AIC)
-nsa.fc <- fabletools::forecast(autofit.arima.bic,h="2 years")
-attr(autofit.arima.bic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
+To evaluate our chosen ARIMA models further, we used each model (for NSA and SA sata respectively) to forecast 2 years in the future (2020-2022) and compared the accuracy of each model against our test data sets (both for NSA and SA data). These results are described below in Table 3.
+
+```{r Out of sample NSA and SA accuracy}
+#NSA
+# Using the ARIMA(1,0,4)(1,1,0) (chosen by AIC)
+nsa.fc <- fabletools::forecast(autofit.arima.aic,h="2 years")
+attr(autofit.arima.aic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
 nd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
 nd <- tsibble::fill_gaps(nd)
 attr(nd$week, "week_start") <- 7
 nd <- as_tsibble(nd)
 # nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
-nsa.fc <- fabletools::forecast(autofit.arima.bic, h="2 years")
-nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
+nsa.fc <- fabletools::forecast(autofit.arima.aic, h="2 years")
+nsa.accuracy.forecast <- nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
+
+#SA
+# Using the ARIMA(1,0,2)(1,1,0) (only model for SA data)
+sa.fc <- fabletools::forecast(autofit.arima.aic.sa,h="2 years")
+attr(autofit.arima.aic.sa$auto[[1]]$fit$tsp$range, 'week_start') <- 7
+sd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
+sd <- tsibble::fill_gaps(sd)
+attr(sd$week, "week_start") <- 7
+sd <- as_tsibble(sd)
+# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
+sa.fc <- fabletools::forecast(autofit.arima.aic.sa, h="2 years")
+sa.accuracy.forecast <- sa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
+
+rbind(nsa.accuracy.forecast, sa.accuracy.forecast) %>% 
+  select(.model, ME, RMSE, MAE, MPE, MAPE, MASE, RMSSE, ACF1) %>%
+  knitr::kable(caption = "Table 3: Present ARIMA Model Forecasting Accuracy 2020-2022")
 ```
 
 ```{r Out of sample SA}
