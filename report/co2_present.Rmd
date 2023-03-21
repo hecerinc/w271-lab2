@@ -1,11 +1,9 @@
 ---
 title: "Comparing Global $CO_{2}$ Emission Models from 1997 and Today"
 short: "A comparative follow up report"
-journal: "AER" # AER, AEJ, PP, JEL
 month: "`r format(Sys.Date(), '%m')`"
 year: "`r format(Sys.Date(), '%Y')`"
-vol: 0
-issue: 0
+geometry: margin=1in
 keywords:
   - Replication
   - Modern Science
@@ -174,7 +172,7 @@ arima.forecast.realised.plot
 
 As evident from Figure 4, the 1997 ARIMA model poorly predicted the $CO_{2}$ concentrations from 1997-2022, especially compared to the quadratic with seasonality model also developed in 1997. From visual inspection, the 1997 ARIMA model predicted a linearly increasing Keeling Curve, rather than the quadratic process demonstrated in the previous model. Because the $CO_{2}$ concentration trends does appear to increase more each year post 1997, following a quadratic pattern more than a linear pattern, the ARIMA model consistently and more drastically underpredicted $CO_{2}$ concentrations at all points throughout the year post 1997. 
 
-## Evaluation of 1997 Forecasts 
+## tEvaluation of 1997 Forecasts 
 
 To more formally compare the 1997 models, we evaluate the specific accuracy of several forecasts generated in the 1997 report to assess how closely they matched the current realized data. In 1997, we predicted the first and final times $CO_{2}$ concetnration levels would reach 420 ppm and 500 ppm. We also evaluated predicted $CO_{2}$ concentrations in the year 2100. As of the date of writing this report (published March 2023), we have not yet crossed the 500 ppm threshold nor have data on $CO_{2}$ in the year 2100, however we have already reached 420 ppm. 
 
@@ -318,7 +316,7 @@ sa.accuracy.forecast$data <- "Seasonally adjusted"
 
 bind_rows(nsa.accuracy.forecast, sa.accuracy.forecast) %>% 
   select(data, .model, ME, RMSE, MAE, MPE, MAPE, ACF1) %>%
-  knitr::kable(caption = "Present ARIMA Model Forecasting Accuracy 2020-2022")
+  knitr::kable(caption = "Present ARIMA Model Forecasting Accuracy 2021,2022")
 ```
 
 
@@ -337,7 +335,7 @@ sa.poly.fit %>% gg_tsresiduals()
 
 ```{r Test accuracy of SA poly model}
 sa.poly.fc <- fabletools::forecast(sa.poly.fit, h="2 years")
-sa.poly.fc %>% fabletools::accuracy(select(test.df, week, season_adjust))
+sa.poly.fc %>% fabletools::accuracy(select(test.df, week, season_adjust)) %>% knitr::kable(caption="Polynomial model accuracy 2021, 2022")
 ```
 
 # How Bad Could It Get?
@@ -397,6 +395,8 @@ mutate(values.2122,
 
 # Conclusions 
 
-What to conclude is unclear. 
+This updated analysis of the Keeling Curve data has provided valuable insights into the dynamics of atmospheric carbon dioxide concentrations. 
 
+Having analyzed and adjusted our previous model for data for the past 20+ years, some concerning results are evident. First, $CO_2$ concentration (as we have used in this analysis) is increasing at an even greater pace than we had originally predicted. Even after we adjust our model, we see that the model under-performs as related to the most current data. This provides us with evidence that more sophisticated model specifications are necessary to adequately capture the increase in $CO_2$, especially in the past 10 years.
 
+Furthermore, the findings of this analysis highlights the importance of continued monitoring of $CO_2$ concentrations and the need for effective policies and strategies to mitigate the impacts of climate change. The Keeling Curve has become an iconic symbol of the global climate crisis, and the updated version analyzed in this report reinforces the urgency of taking action to reduce greenhouse gas emissions and limit global warming.
