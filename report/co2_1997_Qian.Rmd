@@ -2,15 +2,15 @@
 title: "Global $CO_{2}$ Emissions in 1997"
 short: "What Keeling missed all these years"
 author: "Carolyn Dunlap, Ayda Nayeb Nazar, Qian Qiao, Hector Rincon"
-acknowledgements: | 
-  The authors would like to thank their instructors from MIDS 271.
 abstract: | 
   This study analyzes the time series of atmospheric CO2 concentrations from monitoring stations around the world that managed by the National Oceanic and Atmospheric Administration (NOAA). Our goal is to develop a model that accurately captures the trend and seasonality of CO2 concentrations over time, as well as any other relevant patterns or anomalies. To accomplish this, various time series modeling techniques are employed, including linear regression models and seasonal autoregressive integrated moving average (ARIMA) models. The analysis finds that a seasonal ARIMA model with a trend and seasonal difference term provides the best fit to the CO2 time series data. This model reveals a clear upward trend in CO2 concentrations over time, with seasonal variations superimposed on top of this trend.
    
 header-includes: 
   - '\usepackage{graphicx}'
   - '\usepackage{booktabs}'
-output: bookdown::pdf_document2
+output: 
+  pdf_document:
+    toc: false
 fontsize: 11pt
 geometry: margin=0.8in
 ---
@@ -129,15 +129,13 @@ ts_co2 <- as_tsibble(co2)
 ```
 
 ```{r Fitting the linear model, echo=TRUE}
-co2_reg <- ts_co2 %>% 
-	model(TSLM(value ~ trend()))
+co2_reg <- ts_co2 %>% model(TSLM(value ~ trend()))
 ```
 
 Despite the strong linear trend observed in the time series plot, when we examined the residuals of the simple linear model, they do not appear to be white noise and have numerous significant lags and strong seasonal pattern in the ACF plot (data not shown). We can attempt to rectify this by incorporating seasonal dummy variables into our model:
 
 ```{r Fit the seasonalized model, echo=TRUE}
-co2_reg_season <- ts_co2 %>% 
-	model(TSLM(value ~ trend() + season()))
+co2_reg_season <- ts_co2 %>% model(TSLM(value ~ trend() + season()))
 ```
 
 The residuals for this model, however, result in lags that are all autocorrelated and a residual plot that forms a parabolic pattern, which is evidence against the hypothesis that a linear model can appropriately fit the data (data not shown). A polynomial model may therefore be a more sensible option in order to capture the non-linearities in the data, so we then fit the following quadratic model:
@@ -151,18 +149,16 @@ The residuals for this model, however, result in lags that are all autocorrelate
 Estimating the parameters as follows,
 
 ```{r Quad model, echo=TRUE}
-co2_quadratic <- ts_co2 %>% 
-	model(TSLM(value ~ trend() + I(trend()^2)))
+co2_quadratic <- ts_co2 %>% model(TSLM(value ~ trend() + I(trend()^2)))
 ```
 
 The result is a more white-noise-like residual plot, but with strong seasonality still being showcased in the ACF plot (data not shown). We can now attempt to rectify for the seasonality once more with the addition of a seasonal dummy variable:
 
 ```{r Quad model with seasonality, echo=TRUE}
-co2_quadratic_season <- ts_co2 %>% 
-	model(TSLM(value ~ trend() + I(trend()^2) + season()))
+co2_quadratic_season <- ts_co2 %>% model(TSLM(value ~ trend() + I(trend()^2) + season()))
 ```
 
-```{r Quad model with seasonality residuals, echo=FALSE, fig.height=3}
+```{r Quad model with seasonality residuals, echo=FALSE, fig.height=2.8}
 co2_quadratic_season %>% gg_tsresiduals() + ggtitle("Figure 3: Quadratic Model with Seasonality Residuals")
 ```
 
@@ -210,7 +206,7 @@ grid.arrange(p1,p2,p3,p4, nrow = 2, ncol = 2)
 
 From the fitted value plots (Figure 4), we can see that the simple linear and quadratic models capture the trend quite well, but fail to capture the seasonal fluctuations present in the data, although it's important to note that the quadratic model was slightly more successful at this than the linear model (Fig 4a and c). The linear model corrected for seasonality attempts to better capture the seasonal effect and does much better job at doing so, but it underestimates the observed data (Fig 4b). In the end, our final quadratic model with the additional seasonal dummy variable seems to do a good job capturing both trend and seasonal movement in the data (Fig 4d).
 
-```{r Information criteria, echo=FALSE, results='asis'}
+```{r Informationcriteria, echo=FALSE, results='asis'}
 # Compare the AIC, BIC btw linear model and quadratic model
 ic.m1 <- glance(co2_reg) %>%
   dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Linear")
@@ -260,18 +256,11 @@ Although the forecast seems to follow along the same patterns as past $CO_2$ dat
 
 ## ARIMA Models
 
-We begin by first differencing the $CO_2$ data:
-
-```{r, warning=F, fig.height=3}
+```{r, warning=F, echo=FALSE}
 co2_diff <- diff(co2)
-co2_diff2 <- ts_co2 %>%
-	gg_tsdisplay(difference(value, 12) %>% difference(),
-				 plot_type='partial', lag=36) +
-	labs(title="Figure 6: Seasonally Differenced", y="")
-co2_diff2
 ```
 
-From the EDA, we found the $CO_2$ time series had obvious trend and seasonality. Based on the time series plot of the first difference, we now observe that the data's first difference may be stationary, and from the ACF plot, we see seasonal fluctuations every 12 lags (months). A Phillips-Perron and Augmented Dickey-Fuller test can then be run to test the alternate hypothesis that the time series is stationary, as opposed to the null hypothesis that it is explosive, or non stationary.
+We begin by first differencing the $CO_2$ data. From our initial analysis, we found the $CO_2$ time series had obvious trend and seasonality. Based on the time series plot of the first difference, we now observe that the data's first difference may be stationary, and from the ACF plot, we see seasonal fluctuations every 12 lags (months)(data not shown). A Phillips-Perron and Augmented Dickey-Fuller test can then be run to test the alternate hypothesis that the time series is stationary, as opposed to the null hypothesis that it is explosive, or non stationary.
 
 ```{r Run the PP and ADF tests, warning=F, echo=TRUE}
 PP.test(co2_diff)
@@ -280,7 +269,7 @@ adf.test(co2_diff, alternative = "stationary")
 
 Both the Phillips Perron and Augmented Dickey Fuller (ADF) tests show a p-value that is less than $0.05$, therefore providing strong evidence for us to reject the null hypothesis that this time series is non stationary. Thus, the time series with the first difference is stationary and we can start to build the model with 1 difference.
 
-```{r Fit the ARIMA models, warning=FALSE, echo = FALSE}
+```{r Fit the ARIMA models, warning=FALSE, message= FALSE, echo = FALSE}
 fit <-  ts_co2 %>%
 	model(
 		arima111000 = ARIMA(value ~ pdq(1,1,1) + PDQ(0,0,0)),
@@ -293,38 +282,34 @@ fit <-  ts_co2 %>%
   )
 ```
 
-```{r arimamodelstable, echo=FALSE, results='asis'}
+```{r arimamodelstable, warning = FALSE, echo=FALSE, results='asis'}
 fit %>%
   report() %>% arrange(AIC) %>% 
   select(-ar_roots, -ma_roots) %>% knitr::kable(caption = "ARIMA Model Comparison", format = "latex", booktabs = TRUE)
 ```
 
-```{r best ARIMA specs output, message=FALSE}
-fit$auto[[1]]$fit$model
-```
-
-After fitting numerous ARIMA models with varying specifications and running the auto model as well, we find that based on the AIC, AICc scores displayed in the table above, the auto model found to be ARIMA(0,1,3),(0,1,1)(12) has the lowest scores and is therefore the best fit model (Tables 3). When looking at the BIC scores, however, the lowest value was found to be for the ARIMA(0,1,2),(0,1,1)(12) model. Since we are aiming to complete more of a prediction task with our forecasting efforts rather than an explanation task and that AIC is most optimal in minimizing the mean squared error of predictions, we choose to use AIC/AICc as our main information criteria. The best fit model is therefore ARIMA(0,1,3),(0,1,1)(12), which we analyzed the residuals of next:
+After fitting numerous ARIMA models with varying specifications and running the auto model as well, we find that based on the AIC, AICc scores displayed in the table above, the auto model found to be ARIMA(0,1,3),(0,1,1)(12) has the lowest scores and is therefore the best fit model (Table 2). When looking at the BIC scores, however, the lowest value was found to be for the ARIMA(0,1,2),(0,1,1)(12) model. Since we are aiming to complete more of a prediction task with our forecasting efforts rather than an explanation task and that AIC is most optimal in minimizing the mean squared error of predictions, we choose to use AIC/AICc as our main information criteria. The best fit model is therefore ARIMA(0,1,3),(0,1,1)(12), which we analyzed the residuals of next:
 
 ```{r Best ARIMA model residual, echo=FALSE, fig.height= 3}
 arima013011 <- ts_co2 %>%
   model(arima013011 = ARIMA(value ~ pdq(0,1,3) + PDQ(0,1,1)) )
 # Create diagnostic plots for the residuals
 arima013011%>%
-  gg_tsresiduals() + ggtitle("Figure 7: ARIMA(0,1,3),(0,1,1)(12) Residuals")
+  gg_tsresiduals() + ggtitle("Figure 6: ARIMA(0,1,3),(0,1,1)(12) Residuals")
 ```
 
 ```{r Save the ARIMA model to use in the other report}
 saveRDS(arima013011, '1997_arima_modelfit.rds')
 ```
 
-The flat mean of the residuals at 0, the roughly normally distributed residual counts, and the minimally autocorrelated/significant lags in the ACF are all strong evidence that we have white noise residuals and that the ARIMA(0,1,3),(0,1,1)(12) model fits the $CO_2$ model well (Figure 7).
+The flat mean of the residuals at 0, the roughly normally distributed residual counts, and the minimally autocorrelated/significant lags in the ACF are all strong evidence that we have white noise residuals and that the ARIMA(0,1,3),(0,1,1)(12) model fits the $CO_2$ model well (Figure 6).
 
 ```{r Ljung Box test, echo=TRUE}
 augment(arima013011) %>%
 	features(.resid, ljung_box, lag = 10, dof = 0)
 ```
 
-From the Ljung Box test, we got a large p-value that failed to reject the null hypothesis, further supporting that our best model's residuals are randomly distributed, thus making it a good model fit. Generating forecast to the year 2022 with the new ARIMA model shows that the model follows the pattern of past data fairly well (Figure 8).
+From the Ljung Box test, we got a large p-value that failed to reject the null hypothesis, further supporting that our best model's residuals are randomly distributed, thus making it a good model fit. Generating forecast to the year 2022 with the new ARIMA model shows that the model follows the pattern of past data fairly well (Figure 7).
 
 ```{r ARIMA Forecast till 2020, fig.height=3}
 # Create a forecast object based on the model
@@ -333,15 +318,15 @@ save(co2_quadratic_season, file='1997_ARIMA(0,1,3),(0,1,1)(12) model.RData')
 arima.forecast.2022 <- fabletools::forecast(co2_quadratic_season, h = "25 years")
 
 # Forecast + previous data graph
-arima.forecast.2022.graph <- arima.forecast.2022 %>% autoplot(ts_co2) + labs(title="Figure 8: ARIMA(0,1,3),(0,1,1)(12) model forecast 1997-2022", x=NULL, y="Monthly mean CO2 ppm")
+arima.forecast.2022.graph <- arima.forecast.2022 %>% autoplot(ts_co2) + labs(title="Figure 7: ARIMA(0,1,3),(0,1,1)(12) model forecast 1997-2022", x=NULL, y="Monthly mean CO2 ppm")
 arima.forecast.2022.graph
 ```
 
 ## Forecasts
 
-Further forecasts can be generated to the year 2100 to test our model and make predictions about the future. We see the performance within 80% and 95% confidence intervals below (Figure 9, thresholds demarcated by blue horizontal lines), and the times the 420 and 500 ppm thersholds are crossed within the forecasts (Table 5).
+Further forecasts can be generated to the year 2100 to test our model and make predictions about the future. We see the performance within 80% and 95% confidence intervals below (Figure 9, thresholds demarcated by blue horizontal lines), and the times the 420 and 500 ppm thersholds are crossed within the forecasts (Table 3). The forecasts for the year 2100 in particular can be seen in Table 4. Although these data follow the pattern of past data well, it's difficult to say if these are accurate predictions for the future, but if the current trends persist through to the year 2100, then these predictions may not be far off from the true values we will observe in $CO_2$ then.
 
-```{r ARIMA forecast plot, warning=F, message=FALSE, fig.height=4}
+```{r ARIMA forecast plot, warning=F, message=FALSE, fig.height=3.5}
 arima_forecast <- fabletools::forecast(arima013011, h = "103 years", level = c(80, 95)) # all the way to 2100 (1997 + 103 = 2100)
 arima_forecast_plot <- arima_forecast %>%
 	autoplot(colour="cornflowerblue") + 
@@ -386,8 +371,6 @@ forecast.thresholds <- bind_rows(values.420, values.500) %>% select(target, inde
 forecast.thresholds	%>% knitr::kable(caption ="Forecasts for First and Last Crossing of 420ppm and 500ppm", format = "latex", booktabs = TRUE)
 ```
 
-The forecasts for the year 2100 in particular can be seen below in Table 6:
-
 ```{r 2100data, warning=F, echo=FALSE, results='asis'}
 values.2100 <- filter(arima_forecast, index >= as.Date('2100-01-01')) %>% hilo() %>% data.frame()
 mutate(values.2100,
@@ -397,8 +380,6 @@ mutate(values.2100,
 	   ci.95.upper = X95.$upper
 ) %>% select(-X80., -X95.) %>% select(index, .mean, starts_with('ci')) %>% knitr::kable(caption = "Forecasts for CO2 Levels in 2100", format = "latex", booktabs = TRUE)
 ```
-
-Although it follows the pattern of past data well, it's difficult to say if these are accurate predictions for the future, but if the current trends persist through to the year 2100, then these predictions may not be far off from the true values we will observe in $CO_2$ then.
 
 # Conclusions
 
