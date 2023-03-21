@@ -329,7 +329,7 @@ autofit.arima.aic %>% report()
 autofit.arima.bic %>% report()
 
 train.df.ts.sa <- select(train.df, week, season_adjust)
-autofit.arima.aic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=T, greedy=T))
+# autofit.arima.aic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
 # autofit.arima.bic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
 # saveRDS(autofit.arima.aic.sa, file="autofit.arima.aic.sa.Rds")
 # saveRDS(autofit.arima.bic.sa, file="autofit.arima.bic.sa.Rds")
@@ -347,7 +347,7 @@ autofit.arima.bic.sa %>% report()
 
 ```{r In-sample}
 bind_cols(data.frame(
-	model=c('ARIMA(1,0,4)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)', 'ARIMA(1,0,2)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)'),
+	model=c('ARIMA(1,0,4)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)', 'ARIMA(1,0,1)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,3)(2,0,0)[52] (SA data)'),
 	IC=c('AIC', 'AIC', 'BIC', 'BIC')
 	),
 bind_rows(
@@ -360,19 +360,19 @@ bind_rows(
 
 
 ```{r Out of sample NSA}
-# Using the ARIMA(1,0,2)(1,1,0) (chosen by AIC)
 nsa.fc <- fabletools::forecast(autofit.arima.bic, h="2 years")
-# attr(autofit.arima.bic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
-# nd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
-# nd <- tsibble::fill_gaps(nd)
-# attr(nd$week, "week_start") <- 7
-# nd <- as_tsibble(nd)
-# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
 nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
 ```
 
 ```{r Out of sample SA}
+sa.fc <- fabletools::forecast(autofit.arima.bic.sa, h="2 years")
+sa.fc %>% fabletools::accuracy(select(test.df, week, season_adjust))
 ```
+
+```{r Poly-time trend model}
+
+```
+
 
 ## (3 points) Task Part 6b: How bad could it get?
 
