@@ -277,7 +277,7 @@ autofit.arima.aic %>% report()
 autofit.arima.bic %>% report()
 ```
 
-For the NSA data, we fit two ARMIA models, 
+For the NSA data, we fit two ARMIA models, ARIMA(1,0,4)(1,1,0)[52] 
 
 ```{r ARIMA models SA data}
 train.df.ts.sa <- select(train.df, week, season_adjust)
@@ -308,7 +308,8 @@ bind_rows(
 	fabletools::accuracy(autofit.arima.aic.sa),
 	fabletools::accuracy(autofit.arima.bic),
 	fabletools::accuracy(autofit.arima.bic.sa),
-))
+)) %>%
+  knitr::kable()
 ```
 
 
