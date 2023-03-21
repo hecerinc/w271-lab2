@@ -152,7 +152,7 @@ Conduct the same EDA on this data. Describe how the Keeling Curve evolved from 1
 # change eval=T to run this for the first time, otherwise always load the (already saved) data
 noaa_colnames <- c('year', 'month', 'day', 'decimal', 'ppm', 'n.days', 'lag.1Y', 'lag.10Y', 'delta.1800')
 co2_present <- read_table('https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_weekly_mlo.txt', skip = 53, col_names = noaa_colnames, na="-999.99")
-co2_present <- mutate(co2_present, date = as.Date(paste(year, month, day, sep="-"))) %>% mutate(week = yearweek(date, week_start=7)) # start week on Sunday
+co2_present <- mutate(co2_present, date = as.Date(paste(year, month, day, sep="-"))) %>% mutate(week = yearweek(date))
 co2_present <- select(co2_present, -decimal, -delta.1800, -year, -month, -day)
 
 # Create the tsibble
@@ -302,8 +302,8 @@ co2_present.components <- components(dcmp_add)
 ```
 
 ```{r Split train/test}
-test.df <- filter(co2_present.components, year(week) >= 2020 & year(week) < 2023)
-train.df <- filter(co2_present.components, year(week) < 2020)
+test.df <- filter(co2_present.components, year(week) >= 2021 & year(week) < 2023)
+train.df <- filter(co2_present.components, year(week) < 2021)
 ```
 
 ```{r Seasonally adjusted data tests for stationarity}
@@ -321,7 +321,8 @@ adf.test(train.diff.nsa$diff[-1], alternative = "stationary")
 ```{r ARIMA models}
 train.df.ts <- select(train.df, week, ppm)
 # autofit.arima.aic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
-# autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
+# autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=T, greedy=T))
+# saveRDS(autofit.arima.bic, file='autofit.arima.bic.nsa.rds')
 autofit.arima.aic <- readRDS('autofit.arima.aic.nsa.rds')
 autofit.arima.bic <- readRDS('autofit.arima.bic.nsa.rds')
 autofit.arima.aic %>% report()
@@ -346,7 +347,7 @@ autofit.arima.bic.sa %>% report()
 
 ```{r In-sample}
 bind_cols(data.frame(
-	model=c('ARIMA(1,0,4)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)', 'ARIMA(1,0,2)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)'),
+	model=c('ARIMA(1,0,4)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)', 'ARIMA(1,0,1)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,3)(2,0,0)[52] (SA data)'),
 	IC=c('AIC', 'AIC', 'BIC', 'BIC')
 	),
 bind_rows(
@@ -359,21 +360,73 @@ bind_rows(
 
 
 ```{r Out of sample NSA}
-# Using the ARIMA(1,0,2)(1,1,0) (chosen by AIC)
-nsa.fc <- fabletools::forecast(autofit.arima.bic,h="2 years")
-attr(autofit.arima.bic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
-nd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
-nd <- tsibble::fill_gaps(nd)
-attr(nd$week, "week_start") <- 7
-nd <- as_tsibble(nd)
-# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
 nsa.fc <- fabletools::forecast(autofit.arima.bic, h="2 years")
 nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
 ```
 
 ```{r Out of sample SA}
+sa.fc <- fabletools::forecast(autofit.arima.bic.sa, h="2 years")
+sa.fc %>% fabletools::accuracy(select(test.df, week, season_adjust))
 ```
+
+```{r Poly-time trend model to SA}
+sa.poly.fit <- train.df.ts.sa %>% model(TSLM(season_adjust ~ trend() + I(trend()^2)))
+sa.poly.fit %>% report()
+
+sa.poly.fit %>% gg_tsresiduals() 
+```
+```{r Test accuracy of SA poly model}
+sa.poly.fc <- fabletools::forecast(sa.poly.fit, h="2 years")
+sa.poly.fc %>% fabletools::accuracy(select(test.df, week, season_adjust))
+```
+
 
 ## (3 points) Task Part 6b: How bad could it get?
 
 With the non-seasonally adjusted data series, generate predictions for when atmospheric CO2 is expected to be at 420 ppm and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2122. How confident are you that these will be accurate predictions?
+
+```{r 420 and 500 predictions}
+
+nsa.fc <- fabletools::forecast(autofit.arima.bic, h="103 years")
+forecast.420 <- nsa.fc %>% filter(.mean >= 420 & .mean < 421) %>% hilo()
+first.420 <- head(select(forecast.420, `80%`, `95%`, .mean), 1)
+last.420 <- tail(select(forecast.420, `80%`, `95%`, .mean), 1)
+# 500
+forecast.500 <- nsa.fc %>% filter(.mean >= 500 & .mean < 501) %>% hilo()
+first.500 <- head(select(forecast.500, `80%`, `95%`, .mean), 1)
+last.500 <- tail(select(forecast.500, `80%`, `95%`, .mean), 1)
+
+
+values.420 <- data.frame(bind_rows(first.420, last.420))
+values.420$target <- 420
+values.420 <- mutate(values.420,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+
+values.500 <- data.frame(bind_rows(first.500, last.500))
+values.500 <- mutate(values.500,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+values.500$target <- 500
+
+forecast.thresholds <- bind_rows(values.420, values.500) %>% select(target, week, .mean, starts_with('ci'))
+# TODO: change the col names
+forecast.thresholds	%>% knitr::kable()
+```
+
+```{r 2122 data}
+values.2122 <- filter(nsa.fc, week >= as.Date('2122-01-01') & week < as.Date('2123-01-01')) %>% hilo() %>% data.frame()
+mutate(values.2122,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.) %>% select(week, .mean, starts_with('ci')) #%>% knitr::kable()
+```
+
