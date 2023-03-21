@@ -96,6 +96,7 @@ p1_plot <- ggplot(ts_co2_present, aes(x = date, y = ppm)) +
 	theme(axis.text.x=element_text(angle=90, vjust=0.5))
 p1_plot
 ```
+
 From this time series, we observe a steady continuation of the Keeling curve, with a continual increase in $CO_{2}$ concentration (ppm) as well as a notable seasonal component. The curve of the overall increasing $CO_{2}$ concentration, compared to data prior to 1997, does appear to be increasing at a slightly higher rate than what was previously observed.
 
 To more carefully compare the distrbution and autocorrelation aspects of this times series, we conducted further analysis, as shown below in Figure 2.
@@ -125,6 +126,7 @@ p4_pacf <- ts_co2_present %>%
 (p2_histogram) /
   (p3_acf | p4_pacf)
 ```
+
 Figure 2 reveals that the present dataset recapitulates the behavior observed in the 1997 dataset. Similar to what was seen in 1997, there is a strong autocorrelation in $CO_{2}$ concentration with very mild decay, maintaining its strong correlation even after a lag of 30 weeks (Fig 2b). The partial autocorrelation, PACF plot, reveals a first correlation of almost 1 and some cyclical correlations that may correspond to the seasonality of the data (Fib 2c). Taken together, this analysis suggests that there is a seasonal and potentially autoregressive component to the data.
 
 # Models and Forecasts 
@@ -156,6 +158,7 @@ forecast.realised.plot <- ggplot() +
 	scale_color_discrete(name = "Series")
 forecast.realised.plot
 ```
+
 Figure 3 reveals that the quadratic with seasonality model forecast fairly accurately predicts the actual data from 1997-2022. Up until about 2016, the 1997 model does seem to routinely over-predict the trough $CO_{2}$ values per yearand after 2016, the 1997 quadratic with seasonality model routinely under-predicts the peak $CO_{2}$ values per year. This suggests that while the quadratic model fits the data fairly closely, a model that combines several localized trends might better capture the data than a single overarching model.
 
 ## Comparing 1997 ARIMA Models 
@@ -181,13 +184,14 @@ arima.forecast.realised.plot <- ggplot() +
 	scale_color_discrete(name = "Series")
 arima.forecast.realised.plot
 ```
+
 As evident from Figure 4, the 1997 ARIMA model poorly predicted the $CO_{2}$ concentrations from 1997-2022, especially compared to the quadratic with seasonality model also developed in 1997. From visual inspection, the 1997 ARIMA model predicted a linearly increasing Keeling Curve, rather than the quadratic process demonstrated in the previous model. Because the $CO_{2}$ concentration trends does appear to increase more each year post 1997, following a quadratic pattern more than a linear pattern, the ARIMA model consistently and more drastically underpredicted $CO_{2}$ concentrations at all points throughout the year post 1997. 
 
 ## Evaluation of 1997 Forecasts 
 
 To more formally compare the 1997 models, we evaluate the specific accuracy of several forecasts generated in the 1997 report to assess how closely they matched the current realized data. In 1997, we predicted the first and final times $CO_{2}$ concetnration levels would reach 420 ppm and 500 ppm. We also evaluated predicted $CO_{2}$ concentrations in the year 2100. As of the date of writing this report (published March 2023), we have not yet crossed the 500 ppm threshold nor have data on $CO_{2}$ in the year 2100, however we have already reached 420 ppm. 
 
-In the 1997 report, 420 ppm predictions were generated using the ARIMA(0,1,3)(0,1,1)[12] model only, because at the time that model was assessed to best recapitulate the data. In the 1997 report, $CO_{2}$ concentrations was predicted to first cross the 420 ppm threshold in April 2032, however, the current data reveals that we actually first crossed the 420 ppm threshold in May 2021 according to the weekly data and April 2022 when the current data is aggregated monthly, a full 10-11 years prior to the 1997 ARIMA model estimate. As discussed above, the 1997 ARIMA model severely underestimated the growth rate of the Keeling Curve past 1997. In contrast and as can be shown below in Figure 5, the quadatric model with seasonality developed in the 1997 report predicted a May 2022 estimate for monthly mean $CO_{2}$ concentration, which compared to the ARIMA model is a much more accurate forecast.
+In the 1997 report, 420 ppm predictions were generated using the ARIMA(0,1,3)(0,1,1)[12] model only, because at the time that model was assessed to best recapitulate the data. In the 1997 report, $CO_{2}$ concentrations was predicted to first cross the 420 ppm threshold in April 2032, however, the current data reveals that we actually first crossed the 420 ppm threshold in May 2021 according to the weekly data and April 2022 when the current data is aggregated monthly, a full 10-11 years prior to the 1997 ARIMA model estimate. As discussed above, the 1997 ARIMA model severely underestimated the growth rate of the Keeling Curve past 1997. In contrast and as can be shown below in Figure 5 (the blue horizontal line corresponds to the 420 ppm threshold), the quadratic model with seasonality developed in the 1997 report predicted a May 2022 estimate for monthly mean $CO_{2}$ concentration, which compared to the ARIMA model is a much more accurate forecast.
 
 ```{r Produce the monthly series}
 monthly.co2 <- co2_present %>%
@@ -211,13 +215,14 @@ p1 <- ggplot() +
 	scale_color_discrete(name = "Series")
 p1
 ```
+
 To more rigorously compare the accuracy of the two models, we assessed numerous accuracy measures for each 1997 model against the aggregated monthly average data used in the this report, comparing forecasted accuracy from 1997-2022. The results are summarized in Table 1 (below) and reveal that across each metric (mean error (ME), root mean squared error (RMSE), mean absolute error (MAE), mean percentage error (MPE), mean absolute percentage error (MAPE), mean absolute scaled error (MASE), root mean squared scaled error (RMSSE), and autocorrelation errors at lag 1 (ACF1)), the 1997 quadratic with seasonality model outperformed the 1997 ARIMA model.
 
 ```{r Change the names to match the forecast, echo=FALSE}
 names(monthly.co2) <- c('index', 'value', 'index.date')
 ```
 
-```{r Running the tests for comparison}
+```{r Running the tests for comparison, echo= FALSE}
 arima_accuracy <- dec2022.forecast.arima.model %>% fabletools::accuracy(monthly.co2)
 quad_accuracy<- dec2022.forecast.quad.model %>% fabletools::accuracy(monthly.co2)
 
@@ -229,10 +234,11 @@ rbind(arima_accuracy, quad_accuracy) %>%
 
 # Training New Models Based on Present Data
 
-## (4 points) Task 5b: Train best models on present data
-Seasonally adjust the weekly NOAA data, and split both seasonally-adjusted (SA) and non-seasonally-adjusted (NSA) series into training and test sets, using the last two years of observations as the test sets. For both SA and NSA series, fit ARIMA models using all appropriate steps. Measure and discuss how your models perform in-sample and (psuedo-) out-of-sample, comparing candidate models and explaining your choice. In addition, fit a polynomial time-trend model to the seasonally-adjusted series and compare its performance to that of your ARIMA model.
+## ARIMA Models
 
-```{r Seasonally adjust data}
+Since we have conducted a thorough analysis of the models developed in the 1997 report, we now wanted to devise updated models on this more granular and recent $CO_{2}$ concentration data. In order to do this, we seasonally adjusted the weekly data, and split both the seasonally adjusted (SA) and non-seasonally adjusted (NSA) data into training and test sets. Because we are working with time series data, our test sets were comprised of the most recent 2 years of weekly $CO_{2}$ concentrations (2020-2022). We fitted both SA and NSA training data sets to ARIMA models. Before fitting ARIMA models, we took the first difference of the data to remove the increasing trend and evaluated whether or not the weekly data was stationary post differencing (since stationarity is an assumption of ARIMA models). 
+
+```{r Seasonally adjust data, echo=FALSE}
 # There are missing values, so we have to fill in the blanks (fill with the previous week value)
 
 co2_present <- co2_present %>% tidyr::fill(ppm, .direction = "down")
@@ -245,19 +251,23 @@ test.df <- filter(co2_present.components, year(week) >= 2020 & year(week) < 2023
 train.df <- filter(co2_present.components, year(week) < 2020)
 ```
 
-```{r Seasonally adjusted data tests for stationarity}
+```{r Seasonally adjusted data tests for stationarity, warning =FALSE}
 train.diff.sa <- train.df %>% mutate(diff = tsibble::difference(season_adjust, lag=1))
 PP.test(train.diff.sa$diff[-1])
 adf.test(train.diff.sa$diff[-1], alternative = "stationary")
 ```
+As shown above, using both the Phillips-Perron Unit Root Test and Augemented Dickey-Fuller Test we reject the null hypothesis that the first difference of the SA weekly $CO_{2}$ concentration data is non-stationary. 
 
-```{r Non-seasonally adjusted data tests for stationarity}
+
+```{r Non-seasonally adjusted data tests for stationarity, warning=FALSE}
 train.diff.nsa <- train.df %>% mutate(diff = tsibble::difference(ppm, lag=1))
 PP.test(train.diff.nsa$diff[-1])
 adf.test(train.diff.nsa$diff[-1], alternative = "stationary")
 ```
 
-```{r ARIMA models}
+Similarly, using both the Phillips-Perron Unit Root Test and Augemented Dickey-Fuller Test we also reject the null hypothesis that the first difference of the NSA weekly $CO_{2}$ concentration data is non-stationary. We therefore call the first difference of both datasets stationary processes and can proceed to fit ARIMA models. 
+
+```{r ARIMA models NSA data}
 train.df.ts <- select(train.df, week, ppm)
 # autofit.arima.aic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
 # autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
@@ -265,7 +275,11 @@ autofit.arima.aic <- readRDS('autofit.arima.aic.nsa.rds')
 autofit.arima.bic <- readRDS('autofit.arima.bic.nsa.rds')
 autofit.arima.aic %>% report()
 autofit.arima.bic %>% report()
+```
 
+For the NSA data, we fit two ARMIA models, 
+
+```{r ARIMA models SA data}
 train.df.ts.sa <- select(train.df, week, season_adjust)
 # autofit.arima.aic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
 # autofit.arima.bic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
@@ -276,8 +290,10 @@ autofit.arima.aic.sa <- readRDS('autofit.arima.aic.sa.Rds')
 autofit.arima.bic.sa <- readRDS('autofit.arima.bic.sa.Rds')
 
 autofit.arima.aic.sa %>% report()
-autofit.arima.bic.sa %>% report()
+#autofit.arima.bic.sa %>% report()
 ```
+
+
 
 ### Evaluating accuracy
 
@@ -312,10 +328,20 @@ nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
 ```{r Out of sample SA}
 ```
 
+## Polynomial Model
+
+### Evaluating Accuracy
+
+
 # How Bad Could It Get?
 
 ## (3 points) Task Part 6b: How bad could it get?
 With the non-seasonally adjusted data series, generate predictions for when atmospheric CO2 is expected to be at 420 ppm and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2122. How confident are you that these will be accurate predictions?
+
+```{r}
+
+```
+
 
 # Conclusions 
 
