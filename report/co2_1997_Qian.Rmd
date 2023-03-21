@@ -1,35 +1,7 @@
 ---
 title: "Global $CO_{2}$ Emissions in 1997"
 short: "What Keeling missed all these years"
-journal: "AER" # AER, AEJ, PP, JEL
-month: "`r format(Sys.Date(), '%m')`"
-year: "`r format(Sys.Date(), '%Y')`"
-vol: 0
-issue: 0
-keywords:
-  - Replication
-  - Modern Science
-author:
-  - name: Carolyn Dunlap
-    firstname: Carolyn
-    surname: Dunlap
-    email: cadunlap@ischool.berkeley.edu
-    affiliation: UC Berkeley, School of Information
-  - name: Ayda Nayeb Nazar
-    firstname: Ayda
-    surname: Nayeb Nazar
-    email: ayda@ischool.berkeley.edu
-    affiliation: UC Berkeley, School of Information
-  - name: Qian Qiao
-    firstname: Qian
-    surname: Qiao
-    email: qianqiao@ischool.berkeley.edu
-    affiliation: UC Berkeley, School of Information
-  - name: Hector Rincon
-    firstname: Hector
-    surname: Rincon
-    email: hector@ischool.berkeley.edu
-    affiliation: UC Berkeley, School of Information
+author: "Carolyn Dunlap, Ayda Nayeb Nazar, Qian Qiao, Hector Rincon"
 acknowledgements: | 
   The authors would like to thank their instructors from MIDS 271.
 abstract: | 
@@ -38,7 +10,9 @@ abstract: |
 header-includes: 
   - '\usepackage{graphicx}'
   - '\usepackage{booktabs}'
-output: rticles::aea_article
+output: bookdown::pdf_document2
+fontsize: 11pt
+geometry: margin=1in
 ---
 
 ```{r setup, echo=FALSE, warning=FALSE, results="hide", message=FALSE}
@@ -64,9 +38,9 @@ knitr::opts_chunk$set(echo=FALSE)
 options(digits = 3)
 ```
 
-Climate change is one of the most pressing issues of our time. One of the key contributors to climate change is the increase in atmospheric carbon dioxide (CO2) levels. The Keeling Curve, created by Charles David Keeling, shows the steady increase in atmospheric $CO_{2}$ levels over time. What the trend and seasonality lies in the atmospheric $CO_{2}$ changing? How can we use the trend and seasonality to to model the future impacts of climate change? These are the core questions we want to address.This analysis will help us to have a better understanding on a changing climate and to develop strategies for mitigating its effects.
-
 # Background
+
+Climate change is one of the most pressing issues of our time. One of the key contributors to climate change is the increase in atmospheric carbon dioxide (CO2) levels. The Keeling Curve, created by Charles David Keeling, shows the steady increase in atmospheric $CO_{2}$ levels over time. What the trend and seasonality lies in the atmospheric $CO_{2}$ changing? How can we use the trend and seasonality to to model the future impacts of climate change? These are the core questions we want to address.This analysis will help us to have a better understanding on a changing climate and to develop strategies for mitigating its effects.
 
 ## Carbon Emissions
 
@@ -82,60 +56,58 @@ These stations collect CO2 measurements on a continuous basis, with data typical
 
 ## Historical Trends in Atmospheric Carbon
 
-Monthly Atmospheric carbon from 1959 to 1997 is plotted in plot below. The time series plot shows an increasing trend from 1959 to 1997 and there is a seasonal fluctuations every year.
+Monthly Atmospheric carbon from 1959 to 1997 is plotted in plot below. The time series plot (Figure 1a) shows an increasing trend from 1959 to 1997 and there is a seasonal fluctuations every year.
 
-The ACF plot shows a slow decline and while the PACF plot drops sharply after the first lag and shows significance up to three lags, which confirmed our observation from the time series plot that the $CO_{2}$ data has a trend pattern.
+The ACF plot (Figure 1c) shows a slow decline and while the PACF plot (Figure 1d) drops sharply after the first lag and shows significance up to three lags, which confirmed our observation from the time series plot that the $CO_{2}$ data has a trend pattern.
 
-```{r EDA plots, warning=FALSE, message=FALSE, Fig.height = 4}
+```{r EDA plots, warning=FALSE, echo=FALSE, message=FALSE, fig.height = 4}
 ts_co2 <- as_tsibble(co2)
 #time plot, histogram, ACF and PACF
 p1_plot <- ggplot(ts_co2, aes(x = index, y = value)) +
   geom_line() +
   labs(
-    title = TeX(r'(Monthly Mean $CO_2$ per Year)'),
+    title = "Figure 1a",
+    subtitle = TeX(r'(Monthly Mean $CO_2$ per Year)'),
     x = 'Month',
-    y = TeX(r'($CO_2$ parts per million)')
+    y = TeX(r'($CO_2$ ppm)')
   )
 p3_acf <- ts_co2 %>%
   ACF(value) %>%
   autoplot() +
-  labs(title=TeX(r'(ACF of Monthly Mean $CO_2$)'))
+  labs(title = "Figure 1c",
+    subtitle=TeX(r'(ACF of Monthly Mean $CO_2$)'))
 p4_pacf <- ts_co2 %>%
   PACF(value) %>%
   autoplot() +
-  labs(title=TeX(r'(PACF of Monthly Mean $CO_2$)'))
+  labs(title = "Figure 1d",
+    subtitle=TeX(r'(PACF of Monthly Mean $CO_2$)'))
 p2_histogram <- ts_co2 %>%
   ggplot(aes(x = value)) +
   geom_histogram() +
-  labs(title=TeX(r'(Histogram of Monthly Mean $CO_2$)'),
+  labs(title = "Figure 1b",
+    subtitle=TeX(r'(Histogram of Monthly Mean $CO_2$)'),
         x = TeX(r'($CO_2$ parts per million)'))
 
-(p1_plot | p2_histogram) /
-  (p3_acf | p4_pacf)
+(p1_plot) /
+  (p2_histogram | p3_acf | p4_pacf)
 ```
 
-The seasonal plot displays a clear seasonality for each year. The atmospheric $CO_{2}$ level went to peak in April and May, and had the yearly lowest $CO_{2}$ pmm in September and October.
+The seasonal plot (Figure 2) displays a clear seasonality for each year. The atmospheric $CO_{2}$ level went to peak in April and May, and had the yearly lowest $CO_{2}$ pmm in September and October.
 
-```{r, seaonal grap, warning=FALSE, Fig.height = 2.5}
+```{r, seaonal grap, warning=FALSE, echo= FALSE, fig.height = 2}
 
 #seasonal graph
 seasonal_graph <- ts_co2 %>%
   gg_season(value) +
   labs(
-    title = TeX(r'(Monthly Mean $CO_2$ per Year)'),
-    subtitle = 'Seasonal Plot',
+    title = "Figure 2",
+    subtitle = TeX(r'(Seasonal Plot of Monthly Mean $CO_2$)'),
     x = 'Month',
-    y = TeX(r'($CO_2$ parts per million)')
+    y = TeX(r'($CO_2$ ppm)')
   )
 
 
 seasonal_graph
-```
-
-Through the multiplicative composition plot, we observed a clear upward trend in overall $CO_2$ levels over time as well as seasonal patterns.
-
-```{r, decompose plot, warning=FALSE, message=FALSE}
-plot(decompose(co2, type="mult"), Fig.height = 4)
 ```
 
 # Models and Forecasts
@@ -152,39 +124,27 @@ We begin by fitting the following simple linear model motivated by the linear tr
 \text{CO}_{2} = \beta_0 + \beta t
 \end{equation}
 ```
-The model parameters are then estimated in the following way,
+The model parameters are then estimated in the following way:
 
 ```{r loading data}
 ts_co2 <- as_tsibble(co2)
 ```
 
-```{r Fitting the linear model, echo=TRUE, results="hide"}
+```{r Fitting the linear model, echo=TRUE}
 co2_reg <- ts_co2 %>% 
 	model(TSLM(value ~ trend())) %>%
   report()
 ```
 
-```{r linear model residuals}
-co2_reg %>% gg_tsresiduals() + ggtitle("Linear Model Residuals")
-```
+Despite the strong linear trend observed in the time series plot, when we examined the residuals of the simple linear model, they do not appear to be white noise and have numerous significant lags and strong seasonal pattern in the ACF plot (data not shown). We can attempt to rectify this by incorporating seasonal dummy variables into our model:
 
-Despite the strong linear trend observed in the time series plot, the residuals of the simple linear model to not appear to be white noise as showcases by the numerous significant lags and strong seasonal pattern in the ACF plot. We can attempt to rectify this by incorporating seasonal dummy variables into our model,
-
-```{r Fit the seasonalized model, echo=TRUE, results="hide"}
+```{r Fit the seasonalized model, echo=TRUE}
 co2_reg_season <- ts_co2 %>% 
 	model(TSLM(value ~ trend() + season())) %>%
   report()
 ```
 
-```{r seasonalized model report}
-report(co2_reg_season)
-```
-
-```{r seasonalized model residulas}
-co2_reg_season %>% gg_tsresiduals() + ggtitle("Linear Model with Seasonality Residuals")
-```
-
-The residuals for this model, however, result in lags that are all autocorrelated and a residual plot that forms a parabolic pattern, which is evidence against the hypothesis that a linear model can appropriately fit the data. A polynomial model may therefore be a more sensible option in order to capture the non-linearities in the data, so we then fit the following quadratic model:
+The residuals for this model, however, result in lags that are all autocorrelated and a residual plot that forms a parabolic pattern, which is evidence against the hypothesis that a linear model can appropriately fit the data (data not shown). A polynomial model may therefore be a more sensible option in order to capture the non-linearities in the data, so we then fit the following quadratic model:
 
 ```{=tex}
 \begin{equation}
@@ -194,59 +154,63 @@ The residuals for this model, however, result in lags that are all autocorrelate
 ```
 Estimating the parameters as follows,
 
-```{r Quad model, echo=TRUE, results="hide"}
+```{r Quad model, echo=TRUE}
 co2_quadratic <- ts_co2 %>% 
 	model(TSLM(value ~ trend() + I(trend()^2))) %>% 
 	report()
 ```
 
-```{r Quad model residuals}
-co2_quadratic %>% gg_tsresiduals() + ggtitle("Quadratic Model Residuals ")
-```
+The result is a more white-noise-like residual plot, but with strong seasonality still being showcased in the ACF plot (data not shown). We can now attempt to rectify for the seasonality once more with the addition of a seasonal dummy variable,
 
-The result is a more white-noise-like residual plot, but with strong seasonality still being showcased in the ACF plot. We can now attempt to rectify for the seasonality once more with the addition of a seasonal dummy variable,
-
-```{r Quad model with seasonality, echo=TRUE, results="hide"}
+```{r Quad model with seasonality, echo=TRUE}
 co2_quadratic_season <- ts_co2 %>% 
 	model(TSLM(value ~ trend() + I(trend()^2) + season())) %>% 
 	report()
 ```
 
-```{r Quad model with seasonality residuals}
-co2_quadratic_season %>% gg_tsresiduals() + ggtitle("Quadratic Model with Seasonality Residuals")
+```{r Quad model with seasonality residuals, echo=FALSE, fig.height=4}
+co2_quadratic_season %>% gg_tsresiduals() + ggtitle("Figure 3 = Quadratic Model with Seasonality Residuals")
 ```
 
-but despite the addition of the seasonal term, a subtle seasonal pattern can still be observed in the ACF, along with all significant lags and strong autocorrelation in the ACF.
+Despite the addition of the seasonal term, a subtle seasonal pattern can still be observed in the ACF, along with all significant lags and strong autocorrelation in the ACF (Figure 3).
 
-```{r, echo=FALSE,fig.height=6}
+```{r, echo=FALSE,fig.height=5}
 p1 <- augment(co2_reg)%>%
   ggplot(aes(x = index)) +
   geom_line(aes(y = value, colour = "Data")) +
   geom_line(aes(y = .fitted, colour = "Fitted")) +
-  labs(y = "$CO_2$ parts per million",
-       title = "CO2 Linear Model") 
+  labs(y = TeX(r'($CO_2$ ppm)'),
+       x = NULL, 
+       title = "Figure 4a",
+       subtitle = "CO2 Linear Model") 
 p2 <-augment(co2_reg_season)%>%
   ggplot(aes(x = index)) +
   geom_line(aes(y = value, colour = "Data")) +
   geom_line(aes(y = .fitted, colour = "Fitted")) +
-  labs(y = "$CO_2$ parts per million",
-       title = "CO2 Linear + Seasonality")
+  labs(y = TeX(r'($CO_2$ ppm)'),
+       x = NULL,
+       title = "Figure 4b",
+       subtitle = "CO2 Linear + Seasonality")
 p3 <-augment(co2_quadratic)%>%
   ggplot(aes(x = index)) +
   geom_line(aes(y = value, colour = "Data")) +
   geom_line(aes(y = .fitted, colour = "Fitted")) +
-  labs(y = "$CO_2$ parts per million",
-       title = "CO2 Quadratic Model") 
+  labs(y = TeX(r'($CO_2$ ppm)'),
+       x = NULL,
+       title = "Figure 4c",
+       subtitle = "CO2 Quadratic Model") 
 p4 <-augment(co2_quadratic_season)%>%
   ggplot(aes(x = index)) +
   geom_line(aes(y = value, colour = "Data")) +
   geom_line(aes(y = .fitted, colour = "Fitted")) +
-  labs(y = "$CO_2$ parts per million",
-       title = "CO2 Quadratic + Seasonality") 
+  labs(y = TeX(r'($CO_2$ ppm)'),
+       x = NULL,
+       title = "Figure 4d",
+       subtitle = "CO2 Quadratic + Seasonality") 
 grid.arrange(p1,p2,p3,p4, nrow = 2, ncol = 2)
 ```
 
-From the fitted value plots, we can see that the simple linear and quadratic models capture the trend quite well, but fail to capture the seasonal fluctuations present in the data, although it's important to note that the quadratic model was slightly more successful at this than the linear model. The linear model corrected for seasonality attempts to better capture the seasonal effect and does much better job at doing so, but it underestimates the observed data. In the end, our final quadratic model with the additional seasonal dummy variable seems to do a good job capturing both trend and seasonal movement in the data,
+From the fitted value plots (Figure 4), we can see that the simple linear and quadratic models capture the trend quite well, but fail to capture the seasonal fluctuations present in the data, although it's important to note that the quadratic model was slightly more successful at this than the linear model (Fig 4a and c). The linear model corrected for seasonality attempts to better capture the seasonal effect and does much better job at doing so, but it underestimates the observed data (Fig 4b). In the end, our final quadratic model with the additional seasonal dummy variable seems to do a good job capturing both trend and seasonal movement in the data (Fig 4d).
 
 ```{r Information criteria}
 # Compare the AIC, BIC btw linear model and quadratic model
@@ -258,11 +222,11 @@ ic.m3 <- glance(co2_quadratic) %>%
   dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Quadratic")
 ic.m4 <- glance(co2_quadratic_season) %>%
   dplyr::select(adj_r_squared, CV, AIC, AICc, BIC) %>% mutate(name="Quadratic + Seasonality")
-rbind(ic.m1, ic.m2, ic.m3, ic.m4) %>% arrange(AICc, BIC) %>% knitr::kable()
+rbind(ic.m1, ic.m2, ic.m3, ic.m4) %>% arrange(AICc, BIC) %>% knitr::kable(caption = "Table 1: Linear Model Comparison", format = "latex", booktabs = TRUE)
 
 ```
 
-and a quick calculation of the AIC, AICc, and BIC of all tested models confirms this theory as it has the lowest value for all aforementioned information criterion.
+A quick calculation of the AIC, AICc, and BIC of all tested models confirms this theory (Table 1) as it has the lowest value for all aforementioned information criterion.
 
 ```{r, linear models Ljung Box Test}
 lt.m1 <- augment(co2_reg) %>%
@@ -277,73 +241,35 @@ lt.m3 <-augment(co2_quadratic) %>%
 lt.m4 <-augment(co2_quadratic_season) %>%
   features(.innov, ljung_box, dof = 14, lag = 24)
 
-rbind(lt.m1, lt.m2, lt.m3, lt.m4) %>% knitr::kable()
+rbind(lt.m1, lt.m2, lt.m3, lt.m4) %>% knitr::kable(caption = "Table 2: Ljung-Box Test Results for Linear Models", format = "latex", booktabs = TRUE)
 ```
-From the Ljung Box test results, the statistic for all models are high and the p-value are small, we reject the null hypothesis of no autocorrelation. We can conclude that the residuals are auto-correlated.
+From the Ljung Box test results (Table 2), the statistic for all models are high and the p-value are small, we reject the null hypothesis of no autocorrelation. We can conclude that the residuals are auto-correlated.
 
-We then evaluate a logarithmic transformation of the data in order to gauge whether it would be a worthwhile transformation to consider in trying to improve the fit of our models.
-
-```{r Log transformation, echo=TRUE}
-ts_log_co2 <- ts_co2 %>% 
-      mutate(log_co2 = log(value))
-head(ts_log_co2) %>% knitr::kable()
-```
-
-Then new log-transformed data is now used to change the response variable of $CO_2$ for the same four previous models,
-
-```{r linear log models, ,fig.height=2.5}
-log_co2_reg <- ts_log_co2 %>% 
-  model(TSLM(log_co2 ~ trend()))
-log_co2_reg %>%
-gg_tsresiduals() + ggtitle("Linear Model Residuals - Log(CO2)")
-```
-
-```{r linear seasonal log transform, fig.height=2.5}
-log_co2_reg_season <- ts_log_co2 %>% 
-  model(TSLM(log_co2 ~ trend()+ season()))
-log_co2_reg_season %>%
-gg_tsresiduals() + ggtitle("Linear Model with Seasonality Residuals - Log(CO2)")
-```
-
-```{r quad log transform, fig.height=2.5}
-log_co2_quadratic <- ts_log_co2 %>% 
-  model(TSLM(log_co2 ~ trend() + I(trend()^2)))
-log_co2_quadratic %>%
- gg_tsresiduals() + ggtitle("Quadratic Model Residuals - Log(CO2)")
-```
-
-```{r quad seasonal log transform, fig.height=2.5}
-log_co2_quadratic_season<- ts_log_co2 %>% 
-  model(TSLM(log_co2 ~ trend() + I(trend()^2) +season()))
-log_co2_quadratic_season %>%
- gg_tsresiduals() + ggtitle("Quadratic Model with Seasonality Residuals - Log(CO2)")
-```
-
-and no significant change can be observed in the residuals of the models. This is to be expected, however, as the exploratory data analysis above did not show a clear exponential trend in the $CO_2$ data that would need to be smoothed and correct with a logarithmic transformation, and the variance did not appear to increase or decrease over time. Therefore, a logarithmic transformation is not exactly necessary for modeling the $CO_2$ data.
+We then evaluated a logarithmic transformation of the data in order to gauge whether it would be a worthwhile transformation to consider in trying to improve the fit of our models. We analyzed the new log-transformed data in each of the four previous models and no significant change was observed in the residuals (data not shown). This is to be expected, however, as the exploratory data analysis above did not show a clear exponential trend in the $CO_2$ data that would need to be smoothed and correct with a logarithmic transformation, and the variance did not appear to increase or decrease over time. Therefore, a logarithmic transformation is not exactly necessary for modeling the $CO_2$ data.
 
 We further put our best quadratic with seasonality model to the test by generating forecasts to the year 2020, and graphing the results:
 
-```{r Forecast till 2020, echo=TRUE}
+```{r Forecast till 2020, echo=FALSE, fig.height=3}
 # Create a forecast object based on the model and forecast to the year 2020
 save(co2_quadratic_season, file='1997_quad_seasonal_modelfit.RData')
 quad.forecast <- fabletools::forecast(co2_quadratic_season, h = "23 years")
 # Forecast + previous data graph
-forecast.graph <- quad.forecast %>% autoplot(ts_co2) + labs(title="Linear model forecast 1997-2020", x=NULL, y="Monthly mean CO2 ppm")
+forecast.graph <- quad.forecast %>% autoplot(ts_co2) + labs(title="Figure 5: Linear model forecast 1997-2020", x=NULL, y="Monthly mean CO2 ppm")
 forecast.graph
 ```
 
-Although the forecast seems to follow along the same patterns as past $CO_2$ data, there's strong evidence from the high autocorrelation observed in the ACF of the model residuals and the lack of observed white noise residuals that this model does not perfectly fit our model. This therefore motivates exploring an ARIMA model and checking the first difference.
+Although the forecast seems to follow along the same patterns as past $CO_2$ data (Figure 5), there's strong evidence from the high autocorrelation observed in the ACF of the model residuals and the lack of observed white noise residuals that this model does not perfectly fit our model (Figure 3). This therefore motivates exploring an ARIMA model and checking the first difference.
 
 ## ARIMA Models
 
 We begin by first differencing the $CO_2$ data:
 
-```{r, warning=F}
+```{r, warning=F, fig.height=4}
 co2_diff <- diff(co2)
 co2_diff2 <- ts_co2 %>%
 	gg_tsdisplay(difference(value, 12) %>% difference(),
 				 plot_type='partial', lag=36) +
-	labs(title="Seasonally Differenced", y="")
+	labs(title="Figure 6: Seasonally Differenced", y="")
 co2_diff2
 ```
 
@@ -369,56 +295,59 @@ fit <-  ts_co2 %>%
   )
 ```
 
-```{r arima models table, echo=TRUE}
+```{r arima models table, echo=FALSE}
 fit %>%
   report() %>% arrange(AIC) %>% 
-  select(-ar_roots, -ma_roots) %>% knitr::kable()
+  select(-ar_roots, -ma_roots) %>% knitr::kable(caption = "Table 3: ARIMA Model Comparison", format = "latex", booktabs = TRUE)
 ```
 
-```{r Best ARIMA model specs, echo=TRUE}
-fit$auto[[1]]$fit$spec %>% knitr::kable()
+```{r Best ARIMA model specs, echo=FALSE}
+fit$auto[[1]]$fit$spec %>% knitr::kable(caption = "Table 4: Best ARIMA Model Specifications", format = "latex", booktabs = TRUE)
+```
+
+```{r best ARIMA specs output}
 fit$auto[[1]]$fit$model
 ```
 
-After fitting numerous ARIMA models with varying specifications and running the auto model as well, we find that based on the AIC, AICc scores displayed in the table above, the auto model found to be ARIMA(0,1,3),(0,1,1)(12) has the lowest scores and is therefore the best fit model. When looking at the BIC scores, however, the lowest value was found to be for the ARIMA(0,1,2),(0,1,1)(12) model. Since we are aiming to complete more of a prediction task with our forecasting efforts rather than an explanation task and that AIC is most optimal in minimizing the mean squared error of predictions, we choose to use AIC/AICc as our main information criteria. The best fit model is therefore ARIMA(0,1,3),(0,1,1)(12), which we fit next:
+After fitting numerous ARIMA models with varying specifications and running the auto model as well, we find that based on the AIC, AICc scores displayed in the table above, the auto model found to be ARIMA(0,1,3),(0,1,1)(12) has the lowest scores and is therefore the best fit model (Tables 3 and 4). When looking at the BIC scores, however, the lowest value was found to be for the ARIMA(0,1,2),(0,1,1)(12) model. Since we are aiming to complete more of a prediction task with our forecasting efforts rather than an explanation task and that AIC is most optimal in minimizing the mean squared error of predictions, we choose to use AIC/AICc as our main information criteria. The best fit model is therefore ARIMA(0,1,3),(0,1,1)(12), which we fit next:
 
-```{r Best ARIMA model residual}
+```{r Best ARIMA model residual, echo=FALSE, fig.height= 4}
 arima013011 <- ts_co2 %>%
   model(arima013011 = ARIMA(value ~ pdq(0,1,3) + PDQ(0,1,1)) )
 # Create diagnostic plots for the residuals
 arima013011%>%
-  gg_tsresiduals() + ggtitle("ARIMA(0,1,3),(0,1,1)(12) Residuals")
+  gg_tsresiduals() + ggtitle("Figure 7: ARIMA(0,1,3),(0,1,1)(12) Residuals")
 ```
 
 ```{r Save the ARIMA model to use in the other report}
 saveRDS(arima013011, '1997_arima_modelfit.rds')
 ```
 
-The flat mean of the residuals at 0, the roughly normally distributed residual counts, and the minimally autocorrelated/significant lags in the ACF are all strong evidence that we have white noise residuals and that the ARIMA(0,1,3),(0,1,1)(12) model fits the $CO_2$ model well.
+The flat mean of the residuals at 0, the roughly normally distributed residual counts, and the minimally autocorrelated/significant lags in the ACF are all strong evidence that we have white noise residuals and that the ARIMA(0,1,3),(0,1,1)(12) model fits the $CO_2$ model well (Figure 7).
 
 ```{r Ljung Box test, echo=TRUE}
 augment(arima013011) %>%
 	features(.resid, ljung_box, lag = 10, dof = 0)
 ```
 
-From the Ljung Box test, we got a large p-value that failed to reject the null hypothesis, further supporting that our best model's residuals are randomly distributed, thus making it a good model fit. Generating forecast to the year 2022 with the new ARIMA model shows that the model follows the pattern of past data fairly well.
+From the Ljung Box test, we got a large p-value that failed to reject the null hypothesis, further supporting that our best model's residuals are randomly distributed, thus making it a good model fit. Generating forecast to the year 2022 with the new ARIMA model shows that the model follows the pattern of past data fairly well (Figure 8).
 
-```{r ARIMA Forecast till 2020}
+```{r ARIMA Forecast till 2020, fig.height=4}
 # Create a forecast object based on the model
 save(co2_quadratic_season, file='1997_ARIMA(0,1,3),(0,1,1)(12) model.RData')
 
 arima.forecast.2022 <- fabletools::forecast(co2_quadratic_season, h = "25 years")
 
 # Forecast + previous data graph
-arima.forecast.2022.graph <- arima.forecast.2022 %>% autoplot(ts_co2) + labs(title="ARIMA(0,1,3),(0,1,1)(12) model forecast 1997-2022", x=NULL, y="Monthly mean CO2 ppm")
+arima.forecast.2022.graph <- arima.forecast.2022 %>% autoplot(ts_co2) + labs(title="Figure 8: ARIMA(0,1,3),(0,1,1)(12) model forecast 1997-2022", x=NULL, y="Monthly mean CO2 ppm")
 arima.forecast.2022.graph
 ```
 
 ## Forecasts
 
-Further forecasts can be generated to the year 2100 to test our model and make predictions about the future. We see the performance within 80% and 95% confidence intervals below, and the times the 420 and 500 ppm thersholds are crossed within the forecasts.
+Further forecasts can be generated to the year 2100 to test our model and make predictions about the future. We see the performance within 80% and 95% confidence intervals below (Figure 9, thresholds demarcated by blue horizontal lines), and the times the 420 and 500 ppm thersholds are crossed within the forecasts (Table 5).
 
-```{r ARIMA forecast plot, warning=F, message=FALSE}
+```{r ARIMA forecast plot, warning=F, message=FALSE, fig.height=4}
 arima_forecast <- fabletools::forecast(arima013011, h = "103 years", level = c(80, 95)) # all the way to 2100 (1997 + 103 = 2100)
 arima_forecast_plot <- arima_forecast %>%
 	autoplot(colour="cornflowerblue") + 
@@ -428,8 +357,8 @@ arima_forecast_plot <- arima_forecast %>%
 	facet_wrap(~.model, ncol=1, nrow=3) +
 	geom_hline(yintercept = 420, color="steelblue") +
 	geom_hline(yintercept = 500, color="steelblue") +
-	labs(title="ARIMA(0,1,3)(0,1,1) forecast 1997-2100", y="Monthly mean CO2 ppm", x = NULL) +
-	scale_x_yearmonth(date_breaks = "5 year", date_labels = "%Y")
+	labs(title="Figure 9: ARIMA(0,1,3)(0,1,1) forecast 1997-2100", y="Monthly mean CO2 ppm", x = NULL) +
+	scale_x_yearmonth(date_breaks = "10 year", date_labels = "%Y")
 arima_forecast_plot
 ```
 
@@ -460,19 +389,19 @@ values.500 <- mutate(values.500,
 values.500$target <- 500
 forecast.thresholds <- bind_rows(values.420, values.500) %>% select(target, index, .mean, starts_with('ci'))
 
-forecast.thresholds	%>% knitr::kable()
+forecast.thresholds	%>% knitr::kable(caption = "Table 5: Forecasts for First and Last Crossing of 420ppm and 500ppm", format = "latex", booktabs = TRUE)
 ```
 
-The forecasts for the year 2100 in particular can be seen below:
+The forecasts for the year 2100 in particular can be seen below in Table 6:
 
-```{r 2100 data, warning=F}
+```{r 2100 data, warning=F, echo=FALSE, results='asis'}
 values.2100 <- filter(arima_forecast, index >= as.Date('2100-01-01')) %>% hilo() %>% data.frame()
 mutate(values.2100,
 	   ci.80.lower = X80.$lower,
 	   ci.80.upper = X80.$upper,
 	   ci.95.lower = X95.$lower,
 	   ci.95.upper = X95.$upper
-) %>% select(-X80., -X95.) %>% select(index, .mean, starts_with('ci')) %>% knitr::kable()
+) %>% select(-X80., -X95.) %>% select(index, .mean, starts_with('ci')) %>% knitr::kable(caption = "Table 6: Forecasts for First and Last Crossing of 420ppm and 500ppm", format = "latex", booktabs = TRUE)
 ```
 
 Although it follows the pattern of past data well, it's difficult to say if these are accurate predictions for the future, but if the current trends persist through to the year 2100, then these predictions may not be far off from the true values we will observe in $CO_2$ then.
@@ -480,13 +409,3 @@ Although it follows the pattern of past data well, it's difficult to say if thes
 # Conclusions
 
 From the modeling and analysis on atmospheric $CO_{2}$ data from 1959 to 1997, we achieved our goals to answer the initial questions. Firstly, we observed and demonstrated that CO2 concentrations in the Earth's atmosphere have been increasing steadily from 1959 to 1997 and will keep increasing based on both the quadratic model and ARIMA forecast results. Secondly, both linear model and ARIMA with seasonality have better performance than models that didn't considering the seasonality. Finally, the quadratic model with seasonality and ARIMA(0,1,3),(0,1,1)(12) model fit $CO_{2}$ data well, but there's strong evidence that quadratic model has the high autocorrelation observed in the ACF of the model residuals. Therefore, the most plausible model that we estimate is ARIMA(0,1,3),(0,1,1)(12) model and we can use this model to forecast the atmospheric $CO_{2}$ changing.      
-
-
-```{=tex}
-\bibliographystyle{aea}
-\bibliography{references}
-```
-```{=tex}
-\appendix
-\section{Appendix: Model Robustness}
-```
