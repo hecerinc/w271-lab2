@@ -376,11 +376,52 @@ Based on Table 4, we do see that our ARIMA model outperforms our polynomial mode
 
 # How Bad Could It Get?
 
-## (3 points) Task Part 6b: How bad could it get?
+With the non-seasonally adjusted data series, generate predictions for when atmospheric CO2 is expected to be at 420 ppm and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2122. How confident are you that these will be accurate predictions?
 With the non-seasonally adjusted data series, generate predictions for when atmospheric CO2 is expected to be at 420 ppm and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2122. How confident are you that these will be accurate predictions?
 
-```{r}
+```{r 420 and 500 predictions}
 
+nsa.fc <- fabletools::forecast(autofit.arima.bic, h="103 years")
+forecast.420 <- nsa.fc %>% filter(.mean >= 420 & .mean < 421) %>% hilo()
+first.420 <- head(select(forecast.420, `80%`, `95%`, .mean), 1)
+last.420 <- tail(select(forecast.420, `80%`, `95%`, .mean), 1)
+# 500
+forecast.500 <- nsa.fc %>% filter(.mean >= 500 & .mean < 501) %>% hilo()
+first.500 <- head(select(forecast.500, `80%`, `95%`, .mean), 1)
+last.500 <- tail(select(forecast.500, `80%`, `95%`, .mean), 1)
+
+
+values.420 <- data.frame(bind_rows(first.420, last.420))
+values.420$target <- 420
+values.420 <- mutate(values.420,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+
+values.500 <- data.frame(bind_rows(first.500, last.500))
+values.500 <- mutate(values.500,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+values.500$target <- 500
+
+forecast.thresholds <- bind_rows(values.420, values.500) %>% select(target, week, .mean, starts_with('ci'))
+# TODO: change the col names
+forecast.thresholds	%>% knitr::kable()
+```
+
+```{r 2122 data}
+values.2122 <- filter(nsa.fc, week >= as.Date('2122-01-01') & week < as.Date('2123-01-01')) %>% hilo() %>% data.frame()
+mutate(values.2122,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.) %>% select(week, .mean, starts_with('ci')) #%>% knitr::kable()
 ```
 
 
