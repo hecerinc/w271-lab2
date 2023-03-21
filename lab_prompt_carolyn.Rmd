@@ -375,6 +375,7 @@ sa.poly.fit %>% report()
 
 sa.poly.fit %>% gg_tsresiduals() 
 ```
+
 ```{r Test accuracy of SA poly model}
 sa.poly.fc <- fabletools::forecast(sa.poly.fit, h="2 years")
 sa.poly.fc %>% fabletools::accuracy(select(test.df, week, season_adjust))

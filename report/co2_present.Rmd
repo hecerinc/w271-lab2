@@ -31,16 +31,18 @@ knitr::opts_chunk$set(echo=FALSE)
 options(digits = 3)
 ```
 
-```{r load packages, echo = FALSE, message = FALSE}
+```{r load packages, echo = FALSE, message = FALSE, warning=F}
 library(tidyverse)
 library(tsibble)
 library(latex2exp)
 library(patchwork)
 library(lubridate)
+library(tseries)
 library(feasts)
 library(forecast)
 library(sandwich)
 library(lmtest)
+library(fpp3)
 theme_set(theme_minimal())
 knitr::opts_chunk$set(dpi=1000)
 ```
@@ -57,19 +59,6 @@ The first key exception is that in 2019, the observatory installed a new $CO_{2}
 
 A final note about this data set is that in November 29, 2022 Mauna Loa erupted and thus all subsequent data points were collected at the Maunakea observatories, approximately 21 miles north of the Mauna Loa observatory. For ease and data consistency, we have decided to only use data through the end of 2022 in our models and forecasts (up to but not inlcuding the recent Maunakea observations).
 
-```{r Fetch data from NOAA, eval=F, echo=FALSE}
-# change eval=T to run this for the first time, otherwise always load the (already saved) data
-noaa_colnames <- c('year', 'month', 'day', 'decimal', 'ppm', 'n.days', 'lag.1Y', 'lag.10Y', 'delta.1800')
-co2_present <- read_table('https://gml.noaa.gov/webdata/ccgg/trends/co2/co2_weekly_mlo.txt', skip = 53, col_names = noaa_colnames, na="-999.99")
-co2_present <- mutate(co2_present, date = as.Date(paste(year, month, day, sep="-"))) %>% mutate(week = yearweek(date, week_start=7)) # start week on Sunday
-co2_present <- select(co2_present, -decimal, -delta.1800, -year, -month, -day)
-
-# Create the tsibble
-co2_present <- as_tsibble(co2_present, index=week)
-
-# Save the data
-save(co2_present, file='co2_data.RData')
-```
 
 ```{r Load the data, eval=T, echo=FALSE}
 load('co2_data.RData')
@@ -80,10 +69,8 @@ load('co2_data.RData')
 To begin, we conducted the same analysis on this dataset as was done in 1997, beginning with a map of the time series data, shown below in Figure 1, with a vertical red line at 1997 to reflect what new data we have compared to the previous report. 
 
 ```{r present time series, echo = FALSE}
-ts_co2_present <- tsibble::as_tsibble(co2_present)
-
 #time plot
-p1_plot <- ggplot(ts_co2_present, aes(x = date, y = ppm)) +
+p1_plot <- ggplot(co2_present, aes(x = date, y = ppm)) +
   geom_line(color = 'steelblue') +
   geom_vline(xintercept = as.Date("1997-01-01"), color = "red") +
   labs(
@@ -103,20 +90,20 @@ To more carefully compare the distrbution and autocorrelation aspects of this ti
 
 ```{r present histogram ACF PACF, echo = FALSE}
 #histogram, ACF and PACF
-p2_histogram <- ts_co2_present %>%
+p2_histogram <- co2_present %>%
   ggplot(aes(x = ppm)) +
   geom_histogram() +
   labs(title = "Figure 2a", 
     subtitle=TeX(r'(Histogram of Weekly Mean $CO_2$)'),
         x = TeX(r'($CO_2$ parts per million)'))
 
-p3_acf <- ts_co2_present %>%
+p3_acf <- co2_present %>%
   ACF(ppm) %>%
   autoplot() +
   labs(title = "Figure 2b", 
     subtitle=TeX(r'(ACF of Weekly Mean $CO_2$)'))
 
-p4_pacf <- ts_co2_present %>%
+p4_pacf <- co2_present %>%
   PACF(ppm) %>%
   autoplot() +
   labs(title = "Figure 2c", 
@@ -142,7 +129,7 @@ load('1997_quad_seasonal_modelfit.RData') # loads a co2_quadratic_season var
 ```
 
 
-```{r Compare against the realised values, echo=FALSE}
+```{r Compare against the realised values QUAD, echo=FALSE}
 # 1. Forecast using the model until Dec 2022 (from 1997 = 25 years)
 dec2022.forecast.quad.model <- fabletools::forecast(co2_quadratic_season, h="25 years")
 
@@ -169,7 +156,7 @@ In addition to the linear model, the 1997 report also fit an ARIMA model to the 
 co2_arima_fit <- readRDS('1997_arima_modelfit.rds')
 ```
 
-```{r Compare against the realised values}
+```{r Compare against the realised values ARIMA}
 # 1. Forecast using the model until Dec 2022 (from 1997 = 25 years)
 dec2022.forecast.arima.model <- fabletools::forecast(co2_arima_fit, h="25 years")
 
@@ -228,7 +215,7 @@ quad_accuracy<- dec2022.forecast.quad.model %>% fabletools::accuracy(monthly.co2
 
 rbind(arima_accuracy, quad_accuracy) %>% 
   select(.model, ME, RMSE, MAE, MPE, MAPE, MASE, RMSSE, ACF1) %>%
-  knitr::kable(caption = "Table 1: 1997 Model Forecasting Accuracy 1997-2022")
+  knitr::kable(caption = "1997 Model Forecasting Accuracy 1997-2022")
 ```
 
 
@@ -247,8 +234,8 @@ co2_present.components <- components(dcmp_add)
 ```
 
 ```{r Split train/test}
-test.df <- filter(co2_present.components, year(week) >= 2020 & year(week) < 2023)
-train.df <- filter(co2_present.components, year(week) < 2020)
+test.df <- filter(co2_present.components, year(week) >= 2021 & year(week) < 2023)
+train.df <- filter(co2_present.components, year(week) < 2021)
 ```
 
 ```{r Seasonally adjusted data tests for stationarity, warning =FALSE}
@@ -269,17 +256,15 @@ Similarly, using both the Phillips-Perron Unit Root Test and Augemented Dickey-F
 
 ```{r ARIMA models NSA data}
 train.df.ts <- select(train.df, week, ppm)
-# autofit.arima.aic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
-# autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
+# autofit.arima.aic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=T, greedy=T))
+# autofit.arima.bic <- train.df.ts %>% model(auto=ARIMA(ppm ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=T, greedy=T))
+# saveRDS(autofit.arima.aic, file='autofit.arima.aic.nsa.rds')
+# saveRDS(autofit.arima.bic, file='autofit.arima.bic.nsa.rds')
 autofit.arima.aic <- readRDS('autofit.arima.aic.nsa.rds')
 autofit.arima.bic <- readRDS('autofit.arima.bic.nsa.rds')
 autofit.arima.aic %>% report()
 autofit.arima.bic %>% report()
-```
 
-For the NSA data, we fit two ARMIA models, ARIMA(1,0,4)(1,1,0)[52] based on the best (lowest) AIC (AIC = 3377) and ARIMA(1,0,2)(1,1,0)[52] based on the best (lowest) BIC (BIC = 3423) from all permutations of ARIMA models with up to 10 autoregressive processes, 2 unit roots differences, 10 moving average processes, and the equivalent in seasonality components. We used similar techniques to fit the SA data, and found that the same ARIMA model, ARIMA(0,1,2)(1,0,0)[52], had the lowest AIC (AIC = 1841) and BIC (BIC = 1870) for the SA data (model shown below).
-
-```{r ARIMA models SA data}
 train.df.ts.sa <- select(train.df, week, season_adjust)
 # autofit.arima.aic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="aic", stepwise=F, greedy=F))
 # autofit.arima.bic.sa <- train.df.ts.sa %>% model(auto=ARIMA(season_adjust ~ 1 + pdq(0:10,0:2,0:10) + PDQ(0:10,0:2,0:10), ic="bic", stepwise=F, greedy=F))
@@ -290,8 +275,11 @@ autofit.arima.aic.sa <- readRDS('autofit.arima.aic.sa.Rds')
 autofit.arima.bic.sa <- readRDS('autofit.arima.bic.sa.Rds')
 
 autofit.arima.aic.sa %>% report()
-#autofit.arima.bic.sa %>% report()
+autofit.arima.bic.sa %>% report()
 ```
+
+For the NSA data, we fit two ARMIA models, ARIMA(1,0,1)(1,1,0)[52] based on the best (lowest) AIC (AIC = 3524) and ARIMA(1,0,2)(1,1,0)[52] based on the best (lowest) BIC (BIC = 3423) from all permutations of ARIMA models with up to 10 autoregressive processes, 2 unit roots differences, 10 moving average processes, and the equivalent in seasonality components. We used similar techniques to fit the SA data, and found that the same ARIMA model, ARIMA(0,1,2)(1,0,0)[52], had the lowest AIC (AIC = 1841) and BIC (BIC = 1870) for the SA data (model shown below).
+
 For each of these models, we evaluated the model accuracy against the training (in-sample) and test (out-sample) data sets.
 
 ### Evaluating accuracy
@@ -300,7 +288,7 @@ To evaluate the ARIMA models, we first assessed each model (the best model via A
 
 ```{r In-sample}
 bind_cols(data.frame(
-	model=c('ARIMA(1,0,4)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)', 'ARIMA(1,0,2)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)'),
+	model=c('ARIMA(1,0,1)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)', 'ARIMA(1,0,1)(1,1,0)[52] (NSA data)', 'ARIMA(0,1,2)(1,0,0)[52] (SA data)'),
 	IC=c('AIC', 'AIC', 'BIC', 'BIC')
 	),
 bind_rows(
@@ -309,7 +297,7 @@ bind_rows(
 	fabletools::accuracy(autofit.arima.bic),
 	fabletools::accuracy(autofit.arima.bic.sa),
 )) %>%
-  knitr::kable(caption = "Table 2: Evaluating ARIMA model accuracy for present data (Training Data)")
+  knitr::kable(caption = "Evaluating ARIMA model accuracy for present data (Training Data)")
 ```
 
 Based on the in-sample accuracy comparisons, for non seasonally adjusted data, we chose the ARIMA(1,0,4)(1,1,0) model because it had slightly better (lower) root mean squared error and ACF1 compared to the other ARIMA model (ARIMA(1,0,2)(1,1,0)). For the seasonally adjusted data, we only had one ARIMA model, ARIMA(0,1,2)(1,0,0), and use that model for out-sample evaluation.
@@ -318,49 +306,92 @@ To evaluate our chosen ARIMA models further, we used each model (for NSA and SA 
 
 ```{r Out of sample NSA and SA accuracy}
 #NSA
-# Using the ARIMA(1,0,4)(1,1,0) (chosen by AIC)
-nsa.fc <- fabletools::forecast(autofit.arima.aic,h="2 years")
-attr(autofit.arima.aic$auto[[1]]$fit$tsp$range, 'week_start') <- 7
-nd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
-nd <- tsibble::fill_gaps(nd)
-attr(nd$week, "week_start") <- 7
-nd <- as_tsibble(nd)
-# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
 nsa.fc <- fabletools::forecast(autofit.arima.aic, h="2 years")
 nsa.accuracy.forecast <- nsa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
+nsa.accuracy.forecast$data <- "Non-seasonally adjusted"
+
 
 #SA
-# Using the ARIMA(1,0,2)(1,1,0) (only model for SA data)
-sa.fc <- fabletools::forecast(autofit.arima.aic.sa,h="2 years")
-attr(autofit.arima.aic.sa$auto[[1]]$fit$tsp$range, 'week_start') <- 7
-sd <- tsibble(week=yearweek(seq(ymd('2019-12-29'), ymd('2023-01-01'), by ='1 week'), week_start = 7))
-sd <- tsibble::fill_gaps(sd)
-attr(sd$week, "week_start") <- 7
-sd <- as_tsibble(sd)
-# nsa.fc <- fabletools::forecast(autofit.arima.bic, new_data=nd)
-sa.fc <- fabletools::forecast(autofit.arima.aic.sa, h="2 years")
-sa.accuracy.forecast <- sa.fc %>% fabletools::accuracy(select(test.df, week, ppm))
+sa.fc <- fabletools::forecast(autofit.arima.bic.sa, h="2 years")
+sa.accuracy.forecast <- sa.fc %>% fabletools::accuracy(select(test.df, week, season_adjust))
+sa.accuracy.forecast$data <- "Seasonally adjusted"
 
-rbind(nsa.accuracy.forecast, sa.accuracy.forecast) %>% 
-  select(.model, ME, RMSE, MAE, MPE, MAPE, MASE, RMSSE, ACF1) %>%
-  knitr::kable(caption = "Table 3: Present ARIMA Model Forecasting Accuracy 2020-2022")
+bind_rows(nsa.accuracy.forecast, sa.accuracy.forecast) %>% 
+  select(data, .model, ME, RMSE, MAE, MPE, MAPE, ACF1) %>%
+  knitr::kable(caption = "Present ARIMA Model Forecasting Accuracy 2020-2022")
 ```
 
-```{r Out of sample SA}
-```
 
 ## Polynomial Model
 
+
+```{r Poly-time trend model to SA}
+sa.poly.fit <- train.df.ts.sa %>% model(TSLM(season_adjust ~ trend() + I(trend()^2)))
+sa.poly.fit %>% report()
+
+sa.poly.fit %>% gg_tsresiduals() 
+```
+
+
 ### Evaluating Accuracy
 
+```{r Test accuracy of SA poly model}
+sa.poly.fc <- fabletools::forecast(sa.poly.fit, h="2 years")
+sa.poly.fc %>% fabletools::accuracy(select(test.df, week, season_adjust))
+```
 
 # How Bad Could It Get?
 
 ## (3 points) Task Part 6b: How bad could it get?
 With the non-seasonally adjusted data series, generate predictions for when atmospheric CO2 is expected to be at 420 ppm and 500 ppm levels for the first and final times (consider prediction intervals as well as point estimates in your answer). Generate a prediction for atmospheric CO2 levels in the year 2122. How confident are you that these will be accurate predictions?
 
-```{r}
 
+```{r 420 and 500 predictions}
+# nsa.fc <- fabletools::forecast(autofit.arima.aic, h="103 years")
+# saveRDS(nsa.fc, file="forecast_103Y_ARIMA.rds")
+nsa.fc <- readRDS("forecast_103Y_ARIMA.rds")
+forecast.420 <- nsa.fc %>% filter(.mean >= 420 & .mean < 421) %>% hilo()
+first.420 <- head(select(forecast.420, `80%`, `95%`, .mean), 1)
+last.420 <- tail(select(forecast.420, `80%`, `95%`, .mean), 1)
+# 500
+forecast.500 <- nsa.fc %>% filter(.mean >= 500 & .mean < 501) %>% hilo()
+first.500 <- head(select(forecast.500, `80%`, `95%`, .mean), 1)
+last.500 <- tail(select(forecast.500, `80%`, `95%`, .mean), 1)
+
+
+values.420 <- data.frame(bind_rows(first.420, last.420))
+values.420$target <- 420
+values.420 <- mutate(values.420,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+
+values.500 <- data.frame(bind_rows(first.500, last.500))
+values.500 <- mutate(values.500,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.)
+values.500$target <- 500
+
+forecast.thresholds <- bind_rows(values.420, values.500) %>% select(target, week, .mean, starts_with('ci'))
+# TODO: change the col names
+forecast.thresholds	%>% knitr::kable(caption="Predictions on crossing the 420 and 500 CO2 ppm")
+```
+
+We now show predictions for the year 2122:
+
+```{r 2122 data, warning=F}
+values.2122 <- filter(nsa.fc, week >= as.Date('2122-01-01') & week < as.Date('2123-01-01')) %>% hilo() %>% data.frame()
+mutate(values.2122,
+	   ci.80.lower = X80.$lower,
+	   ci.80.upper = X80.$upper,
+	   ci.95.lower = X95.$lower,
+	   ci.95.upper = X95.$upper
+) %>% select(-X80., -X95.) %>% select(week, .mean, starts_with('ci')) %>% knitr::kable(caption = "Predictions for the year 2122")
 ```
 
 
